@@ -1,0 +1,12 @@
+# Copy to .dev.vars (git-ignored) for local development. Names only here.
+# Full list of variable names: /.env.example at the repo root.
+NEXTJS_ENV=development
+BETTER_AUTH_SECRET=
+BETTER_AUTH_URL=http://localhost:3000
+# Admin panel login: the ONLY credentials that can sign in to /admin (password: 12+ characters)
+ADMIN_USERNAME=
+ADMIN_PASSWORD=
+ADMIN_NAME=
+# Two-factor (authenticator app). Optional under `pnpm dev`, REQUIRED by production builds
+# (including `pnpm preview`). Generate with: node scripts/generate-totp-secret.mjs
+ADMIN_TOTP_SECRET=
