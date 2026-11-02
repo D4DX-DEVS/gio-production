@@ -45,7 +45,7 @@ migration-reports/
 *contact-submissions*.csv
 *contact-submissions*.json
 
-# Database dumps and exports (Drizzle migrations and docs/audit/*.sql stay tracked)
+# Database dumps and exports: every .sql file except the Drizzle migrations
 *.sql.gz
 *.sql.bz2
 *.sql.xz
@@ -54,10 +54,8 @@ migration-reports/
 *.mysql
 *.bak
 *.wxr
-/*.sql
-*dump*.sql
-*backup*.sql
-*export*.sql
+*.sql
+!/packages/db/migrations/*.sql
 
 # Archives (uploads ZIPs, backup bundles)
 *.zip

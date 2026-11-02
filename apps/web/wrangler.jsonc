@@ -1,12 +1,11 @@
-// Local development configuration only.
-// No remote resources exist yet: the D1 database_id is a placeholder and the
-// R2 buckets are emulated by Miniflare in .wrangler/state/. Do not deploy from
-// this file until decisions C1/D1/D2 in docs/audit/04-STATUS-AND-DECISIONS.md
-// are answered; staging/production environments will be added then.
+// Cloudflare configuration for the production resources (D1 gio-prod, R2 gio-media,
+// gio-private and gio-kerala-opennext-cache). IDs and bucket names are not secrets;
+// secrets are set with `wrangler secret put`, never here.
+// `pnpm dev` and `pnpm preview` still run against local emulations in .wrangler/state/.
 {
 	"$schema": "node_modules/wrangler/config-schema.json",
 	// Custom entry: legacy WordPress URLs and /wp-content/uploads first, then OpenNext.
-	// See docs/architecture/LEGACY_URL_AND_MEDIA_LAYER.md
+	// See src/legacy/.
 	"main": "worker.ts",
 	"name": "gio-kerala-web",
 	"compatibility_date": "2026-10-01",
@@ -26,9 +25,8 @@
 	"d1_databases": [
 		{
 			"binding": "DB",
-			"database_name": "gio-local",
-			// Placeholder. Local D1 lives in .wrangler/state/; no remote database exists.
-			"database_id": "00000000-0000-0000-0000-000000000000",
+			"database_name": "gio-prod",
+			"database_id": "adb0fa5d-11ce-4f7b-9de8-b2bc1bca7e06",
 			"migrations_dir": "../../packages/db/migrations"
 		}
 	],
@@ -36,17 +34,17 @@
 		{
 			// OpenNext incremental cache (ISR / "use cache" data)
 			"binding": "NEXT_INC_CACHE_R2_BUCKET",
-			"bucket_name": "gio-kerala-opennext-cache-local"
+			"bucket_name": "gio-kerala-opennext-cache"
 		},
 		{
-			// Public media (legacy wp-content/uploads keys and new uploads), see 05-MIGRATION-DESIGN.md §5.1
+			// Public media (legacy wp-content/uploads keys and new uploads)
 			"binding": "MEDIA",
-			"bucket_name": "gio-media-local"
+			"bucket_name": "gio-media"
 		},
 		{
 			// Private bucket (snapshots, reports, backups); never served publicly
 			"binding": "PRIVATE",
-			"bucket_name": "gio-private-local"
+			"bucket_name": "gio-private"
 		}
 	],
 	"images": {

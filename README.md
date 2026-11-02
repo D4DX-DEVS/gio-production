@@ -67,12 +67,20 @@ pnpm test
 
 ## Deploy to Cloudflare
 
-`apps/web/wrangler.jsonc` is currently a local configuration: the D1 `database_id` is a placeholder and the bucket names end in `-local`. Before the first deployment:
+`apps/web/wrangler.jsonc` points at the production resources:
 
-1. Create the D1 database and the R2 buckets (`MEDIA`, `PRIVATE`, and the OpenNext cache bucket), then put their real IDs and names in `apps/web/wrangler.jsonc`.
-2. Set the secrets listed above with `wrangler secret put`.
-3. Apply the database migrations: `pnpm --filter web exec wrangler d1 migrations apply DB --remote`.
-4. Build and deploy:
+| Binding | Cloudflare resource |
+|---|---|
+| `DB` | D1 database `gio-prod` |
+| `MEDIA` | R2 bucket `gio-media` |
+| `PRIVATE` | R2 bucket `gio-private` |
+| `NEXT_INC_CACHE_R2_BUCKET` | R2 bucket `gio-kerala-opennext-cache` |
+
+The database already has its tables and content, and the media are in `gio-media`. To deploy:
+
+1. Set the secrets listed above with `wrangler secret put` (run inside `apps/web`).
+2. Apply any new database migrations: `pnpm --filter web exec wrangler d1 migrations apply DB --remote`.
+3. Build and deploy:
 
    ```bash
    pnpm build:cf
