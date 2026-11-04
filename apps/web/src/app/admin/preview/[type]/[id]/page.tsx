@@ -7,6 +7,7 @@ import { and, eq, isNull } from "drizzle-orm";
 import { schema as s } from "@gio/db";
 import { buildPageLayout } from "@gio/db/layout";
 import { Img } from "@/components/Img";
+import { SectionFrame } from "@/components/SectionFrame";
 import { Sections } from "@/components/Sections";
 import { Container } from "@/components/ui";
 import { getMedia } from "@/lib/content";
@@ -42,13 +43,28 @@ export default async function Preview({ params }: { params: Promise<{ type: stri
     const [page] = await db.select().from(s.pages).where(and(eq(s.pages.id, id), isNull(s.pages.deletedAt))).limit(1);
     if (!page) notFound();
     const layout = await buildPageLayout(db, id);
+    // Homepage: show where the "latest news" row sits (the live site fills it with the newest stories).
+    const newsAt = page.slug === "" ? layout.sections.findIndex((x) => x.type === "latest_posts") : -1;
+    const newsRow = newsAt >= 0 ? layout.sections[newsAt] : null;
+    const inserts =
+      newsRow && !newsRow.data.hidden
+        ? {
+            [newsAt]: (
+              <SectionFrame data={newsRow.data}>
+                <Container className="py-8">
+                  <div className="rounded-2xl border border-dashed border-line bg-paper px-6 py-10 text-center text-sm text-muted">Latest news show here on the live homepage.</div>
+                </Container>
+              </SectionFrame>
+            ),
+          }
+        : undefined;
     return (
       <div className="min-h-screen bg-white">
         <Bar label={page.slug === "" ? "Homepage (draft sections)" : page.title} status={page.status} edit={page.slug === "" ? "/admin/homepage/banners/" : `/admin/pages/${id}/`} />
-        {page.slug === "" ? (
+        {page.slug === "" && !newsRow ? (
           <p className="bg-paper px-4 py-2 text-center text-xs text-muted">The live homepage also shows the latest news and events between these sections.</p>
         ) : null}
-        {layout.sections.length ? <Sections layout={layout} pageTitle={page.title} /> : <Container className="py-16 text-center text-muted">No visible sections in the draft.</Container>}
+        {layout.sections.length ? <Sections layout={layout} pageTitle={page.title} inserts={inserts} /> : <Container className="py-16 text-center text-muted">No visible sections in the draft.</Container>}
       </div>
     );
   }

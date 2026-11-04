@@ -148,7 +148,7 @@ export default async function InboxPage({ searchParams }: { searchParams: Promis
   const canEdit = hasRole(user, "editor");
   return (
     <>
-      <PageHeader title="Contact inbox" description="Messages sent with the form on the Contact Us page, and ones added here. They contain personal data: do not forward them outside the organisation." />
+      <PageHeader icon="mail" title="Contact inbox" description="Messages sent with the form on the Contact Us page, and ones added here. They contain personal data: do not forward them outside the organisation." />
       {canEdit ? (
         <details className="mb-5 rounded-xl border border-line bg-white shadow-sm">
           <summary className="cursor-pointer px-5 py-3 font-semibold text-brand-900">+ Add a message</summary>

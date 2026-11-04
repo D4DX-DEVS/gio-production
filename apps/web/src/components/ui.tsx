@@ -64,7 +64,7 @@ export function SectionHeading({ eyebrow, title, action }: { eyebrow?: string; t
       <div>
         {eyebrow && (
           <p className="mb-1 flex items-center gap-2 text-xs font-semibold uppercase tracking-[0.18em] text-accent-600 sm:text-[0.8125rem]">
-            <span aria-hidden className="h-0.5 w-5 rounded-full bg-accent-600" />
+            <span aria-hidden className="reveal-line h-0.5 w-6 origin-left rounded-full bg-accent-600" />
             {eyebrow}
           </p>
         )}
@@ -85,7 +85,7 @@ export function PostCard({ post, featured = false }: { post: PostCardData; featu
   const excerpt = stripHtml(post.excerpt, featured ? 260 : 140);
   return (
     <article className="card-lift group relative flex h-full flex-col overflow-hidden rounded-2xl border border-line bg-white shadow-card hover:border-brand-200">
-      <div className={`relative overflow-hidden bg-brand-50 ${post.image ? "skeleton" : ""} ${featured ? "aspect-video" : "aspect-[16/10]"}`}>
+      <div className={`lit relative overflow-hidden bg-brand-50 ${post.image ? "skeleton" : ""} ${featured ? "aspect-video" : "aspect-[16/10]"}`}>
         <Img media={post.image} alt="" className="zoom-media reveal-img h-full w-full object-cover" fallbackLabel="No image published for this post" />
         {post.categories[0] && (
           <span className="absolute left-2.5 top-2.5 rounded-full bg-white/95 px-2.5 py-0.5 text-xs font-semibold text-brand-700 shadow-sm">{post.categories[0].name.replace(/^gio /i, "GIO ")}</span>
@@ -146,7 +146,7 @@ export function EventCard({ event }: { event: EventCardData }) {
         </div>
       </div>
       {event.image && (
-        <div className="skeleton hidden w-32 shrink-0 overflow-hidden sm:block lg:w-40">
+        <div className="lit skeleton hidden w-32 shrink-0 overflow-hidden sm:block lg:w-40">
           <Img media={event.image} alt="" className="zoom-media reveal-img h-full w-full object-cover" />
         </div>
       )}

@@ -10,7 +10,7 @@ export default async function NewEvent() {
   await requireRole("editor");
   return (
     <>
-      <PageHeader
+      <PageHeader icon="calendar" back={{ href: "/admin/events/", label: "Events" }}
         title="New event"
         actions={
           <Link href="/admin/events/" className="btn btn-ghost">

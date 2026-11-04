@@ -23,7 +23,7 @@ const dateFmt = new Intl.DateTimeFormat("en-IN", { day: "numeric", month: "short
 function PlayBadge({ size }: { size: "lg" | "sm" }) {
   return (
     <span
-      className={`flex items-center justify-center rounded-full bg-accent-600 text-white shadow-xl shadow-black/30 transition duration-300 group-hover:scale-110 group-hover:bg-accent-500 ${
+      className={`flex items-center justify-center rounded-full bg-danger-600 text-white shadow-xl shadow-black/30 transition duration-300 group-hover:scale-110 group-hover:bg-danger-500 ${
         size === "lg" ? "h-12 w-12 sm:h-16 sm:w-16" : "h-10 w-10 sm:h-12 sm:w-12"
       }`}
     >
@@ -62,7 +62,7 @@ export function VideoCards({ videos }: { videos: VideoCard[] }) {
               <button
                 type="button"
                 onClick={() => setActive(v)}
-                className="group relative block h-full w-full overflow-hidden rounded-2xl bg-brand-800 text-left shadow-lg shadow-black/20 ring-1 ring-white/10 transition-all duration-700 ease-[cubic-bezier(.2,.8,.2,1.15)] hover:-translate-y-1 hover:shadow-2xl hover:shadow-black/40 hover:ring-accent-500/60 focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-accent-500"
+                className="lit group relative block h-full w-full overflow-hidden rounded-2xl bg-brand-800 text-left shadow-lg shadow-black/20 ring-1 ring-white/10 transition-all duration-700 ease-[cubic-bezier(.2,.8,.2,1.15)] hover:-translate-y-1 hover:shadow-2xl hover:shadow-black/40 hover:ring-accent-500/60 focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-accent-500"
                 aria-label={`Play video: ${v.title}`}
               >
                 {/* On lg the featured card fills its two grid rows; that height only exists when other cards are there to make the rows. */}

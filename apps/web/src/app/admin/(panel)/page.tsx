@@ -1,79 +1,46 @@
+// "Today": what needs you, what is ready to go live, and the shortest way to start the common jobs.
 import Link from "next/link";
 import type { ReactNode } from "react";
-import { and, count, desc, eq, inArray, isNull, sql } from "drizzle-orm";
+import { and, count, desc, eq, inArray, isNull, or, sql } from "drizzle-orm";
 import { galleryCount, homepageCounts } from "@/lib/admin/stats";
 import { schema } from "@gio/db";
 import { getDb } from "@/lib/db";
-import { requireRole } from "@/lib/admin/guard";
+import { hasRole, requireRole } from "@/lib/admin/guard";
 import { fmtDate } from "@/lib/admin/form";
+import { homepageDraft } from "@/lib/admin/homepage";
+import { AdminIcon, type AdminIconName } from "@/lib/admin/icons";
 import { Badge } from "@/lib/admin/ui";
 
-export const metadata = { title: "Dashboard" };
-
-// Outline icons (24px grid, drawn with currentColor) so the dashboard needs no icon package.
-const ICONS = {
-  news: "M4 5h13v14H6a2 2 0 0 1-2-2V5Zm13 4h3v8a2 2 0 0 1-2 2M8 9h5M8 13h5M8 17h3",
-  calendar: "M4 7a2 2 0 0 1 2-2h12a2 2 0 0 1 2 2v12a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V7Zm0 4h16M8 3v4M16 3v4",
-  poster: "M6 3h12v18l-6-4-6 4V3Z",
-  banner: "M3 6a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2v12a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V6Zm0 10 5-5 4 4 3-3 6 6",
-  video: "M3 7a2 2 0 0 1 2-2h10a2 2 0 0 1 2 2v10a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V7Zm14 3 4-2.5v9L17 14",
-  gallery: "M7 3h12a2 2 0 0 1 2 2v12M3 9a2 2 0 0 1 2-2h10a2 2 0 0 1 2 2v10a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V9Zm0 9 4-4 3 3 2-2 5 5",
-  image: "M4 5a1 1 0 0 1 1-1h14a1 1 0 0 1 1 1v14a1 1 0 0 1-1 1H5a1 1 0 0 1-1-1V5Zm5 5a1.5 1.5 0 1 0 0-3 1.5 1.5 0 0 0 0 3Zm11 5-5-5L5 20",
-  pages: "M14 3H6a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V9l-6-6Zm0 0v6h6M8 13h8M8 17h5",
-  review: "M9 11l3 3 8-8M20 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11",
-  mail: "M3 6a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2v12a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V6Zm0 1 9 6 9-6",
-  draft: "M4 20h4L19 9l-4-4L4 16v4Zm9-13 4 4",
-  plus: "M12 5v14M5 12h14",
-  arrow: "M5 12h14m-5-5 5 5-5 5",
-  pulse: "M3 12h4l3-8 4 16 3-8h4",
-  check: "M5 13l4 4L19 7",
-} as const;
-
-function Icon({ name, className = "h-5 w-5" }: { name: keyof typeof ICONS; className?: string }) {
-  return (
-    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={1.8} strokeLinecap="round" strokeLinejoin="round" className={className} aria-hidden>
-      <path d={ICONS[name]} />
-    </svg>
-  );
-}
-
-// Full class strings so Tailwind sees every colour it needs.
-const TONE = {
-  brand: { icon: "bg-brand-50 text-brand-600 ring-brand-100", bar: "from-brand-500 to-brand-300" },
-  accent: { icon: "bg-red-50 text-accent-600 ring-red-100", bar: "from-accent-500 to-red-300" },
-  amber: { icon: "bg-amber-50 text-amber-600 ring-amber-100", bar: "from-amber-500 to-amber-300" },
-  emerald: { icon: "bg-emerald-50 text-emerald-600 ring-emerald-100", bar: "from-emerald-500 to-emerald-300" },
-  violet: { icon: "bg-violet-50 text-violet-600 ring-violet-100", bar: "from-violet-500 to-violet-300" },
-  sky: { icon: "bg-sky-50 text-sky-600 ring-sky-100", bar: "from-sky-500 to-sky-300" },
-} as const;
+export const metadata = { title: "Today" };
 
 const ACTION_DOT: Record<string, string> = {
-  create: "bg-emerald-500 ring-emerald-100",
-  upload: "bg-emerald-500 ring-emerald-100",
-  publish: "bg-brand-500 ring-brand-100",
+  create: "bg-brand-500 ring-brand-100",
+  upload: "bg-brand-500 ring-brand-100",
+  publish: "bg-brand-700 ring-brand-100",
   update: "bg-brand-400 ring-brand-100",
   replace: "bg-brand-400 ring-brand-100",
-  reorder: "bg-violet-400 ring-violet-100",
-  delete: "bg-accent-500 ring-red-100",
+  reorder: "bg-brand-300 ring-brand-100",
+  delete: "bg-danger-500 ring-red-100",
 };
 
-function Panel({ title, icon, aside, footer, className = "", children }: { title: string; icon: keyof typeof ICONS; aside?: ReactNode; footer?: ReactNode; className?: string; children: ReactNode }) {
+function Panel({ title, aside, children, className = "" }: { title: string; aside?: ReactNode; children: ReactNode; className?: string }) {
   return (
-    <section className={`flex flex-col rounded-2xl border border-line bg-white shadow-sm ${className}`}>
-      <header className="flex items-center justify-between gap-3 border-b border-line px-4 py-2.5">
-        <h2 className="flex items-center gap-2 text-sm font-semibold text-brand-900">
-          <span className="grid h-6 w-6 place-items-center rounded-md bg-brand-50 text-brand-600">
-            <Icon name={icon} className="h-3.5 w-3.5" />
-          </span>
-          {title}
-        </h2>
+    <section className={`rounded-[1.25rem] border border-line bg-white p-2 ${className}`}>
+      <div className="flex items-center justify-between gap-3 px-4 pb-1 pt-3.5">
+        <h2 className="text-xl font-semibold tracking-tight text-brand-900">{title}</h2>
         {aside}
-      </header>
-      <div className="flex-1 px-4 py-2">{children}</div>
-      {footer ? <footer className="border-t border-line px-4 py-2">{footer}</footer> : null}
+      </div>
+      {children}
     </section>
   );
 }
+
+const TAG = {
+  red: "bg-accent-600 text-white",
+  soft: "bg-accent-600/10 text-accent-700",
+  blue: "bg-brand-100 text-brand-700",
+  grey: "bg-paper text-ink ring-1 ring-inset ring-line",
+} as const;
 
 function greeting(): string {
   const hour = Number(new Intl.DateTimeFormat("en-IN", { timeZone: "Asia/Kolkata", hour: "numeric", hour12: false }).format(new Date()));
@@ -82,224 +49,256 @@ function greeting(): string {
 
 export default async function Dashboard() {
   const { user } = await requireRole("contributor");
+  const isEditor = hasRole(user, "editor");
+  const isAdmin = hasRole(user, "admin");
   const db = getDb();
   const s = schema;
   const n = async (q: Promise<{ n: number }[]>) => (await q)[0]?.n ?? 0;
 
-  const [posts, drafts, pages, events, leaders, media, documents, pendingReview, newMessages, recentPosts, reviewByCode, activity] = await Promise.all([
+  const [posts, drafts, untitled, events, upcoming, leaders, documents, pendingReview, newMessages, noAlt, oldUrls, fixedPages, recentPosts, recentEvents, activity] = await Promise.all([
     n(db.select({ n: count() }).from(s.posts).where(and(eq(s.posts.status, "published"), isNull(s.posts.deletedAt)))),
     n(db.select({ n: count() }).from(s.posts).where(and(eq(s.posts.status, "draft"), isNull(s.posts.deletedAt)))),
-    n(db.select({ n: count() }).from(s.pages).where(isNull(s.pages.deletedAt))),
+    n(db.select({ n: count() }).from(s.posts).where(and(eq(s.posts.status, "published"), isNull(s.posts.deletedAt), or(isNull(s.posts.title), eq(s.posts.title, ""))))),
     n(db.select({ n: count() }).from(s.events).where(isNull(s.events.deletedAt))),
-    n(db.select({ n: count() }).from(s.leaders)),
-    n(db.select({ n: count() }).from(s.media).where(and(isNull(s.media.deletedAt), isNull(s.media.variantOfMediaId)))),
-    n(db.select({ n: count() }).from(s.documents)),
-    n(db.select({ n: count() }).from(s.reviewItems).where(eq(s.reviewItems.status, "pending"))),
-    n(db.select({ n: count() }).from(s.contactSubmissions).where(eq(s.contactSubmissions.status, "new"))),
-    db
-      .select({ id: s.posts.id, title: s.posts.title, status: s.posts.status, publishedAt: s.posts.publishedAt, updatedAt: s.posts.updatedAt })
-      .from(s.posts)
-      .where(isNull(s.posts.deletedAt))
-      .orderBy(desc(s.posts.updatedAt))
-      .limit(6),
-    db
-      .select({ code: s.reviewItems.code, n: count() })
-      .from(s.reviewItems)
-      .where(eq(s.reviewItems.status, "pending"))
-      .groupBy(s.reviewItems.code)
-      .orderBy(desc(count()))
-      .limit(8),
-    db.select().from(s.auditLog).orderBy(desc(s.auditLog.createdAt)).limit(8),
-  ]);
-  const [home, gallery, upcoming, images, recentEvents] = await Promise.all([
-    homepageCounts(db),
-    galleryCount(db),
     n(
       db
         .select({ n: count() })
         .from(s.events)
         .where(and(inArray(s.events.status, ["published", "scheduled"]), isNull(s.events.deletedAt), sql`coalesce(${s.events.endsAt}, ${s.events.startsAt}) >= ${Date.now()}`)),
     ),
-    n(db.select({ n: count() }).from(s.media).where(and(eq(s.media.kind, "image"), isNull(s.media.deletedAt), isNull(s.media.variantOfMediaId)))),
+    n(db.select({ n: count() }).from(s.leaders)),
+    n(db.select({ n: count() }).from(s.documents)),
+    n(db.select({ n: count() }).from(s.reviewItems).where(eq(s.reviewItems.status, "pending"))),
+    n(db.select({ n: count() }).from(s.contactSubmissions).where(eq(s.contactSubmissions.status, "new"))),
+    n(db.select({ n: count() }).from(s.media).where(and(eq(s.media.kind, "image"), isNull(s.media.altText), isNull(s.media.deletedAt), isNull(s.media.variantOfMediaId)))),
+    isAdmin ? n(db.select({ n: count() }).from(s.legacyUrls).where(eq(s.legacyUrls.action, "pending_decision"))) : Promise.resolve(0),
+    db
+      .select({ id: s.pages.id, slug: s.pages.slug })
+      .from(s.pages)
+      .where(and(inArray(s.pages.slug, ["", "about-us", "contact-us"]), isNull(s.pages.deletedAt))),
+    db
+      .select({ id: s.posts.id, title: s.posts.title, status: s.posts.status, updatedAt: s.posts.updatedAt })
+      .from(s.posts)
+      .where(isNull(s.posts.deletedAt))
+      .orderBy(desc(s.posts.updatedAt))
+      .limit(6),
     db
       .select({ id: s.events.id, title: s.events.title, status: s.events.status, updatedAt: s.events.updatedAt })
       .from(s.events)
       .where(isNull(s.events.deletedAt))
       .orderBy(desc(s.events.updatedAt))
       .limit(6),
+    db.select().from(s.auditLog).orderBy(desc(s.auditLog.createdAt)).limit(8),
   ]);
+  const [home, gallery, homeDraft] = await Promise.all([homepageCounts(db), galleryCount(db), homepageDraft(db).catch(() => null)]);
+  const pageId = new Map(fixedPages.map((p) => [p.slug, p.id]));
+  const pageHref = (slug: string) => (pageId.has(slug) ? `/admin/pages/${pageId.get(slug)}/` : "/admin/pages/");
+
   const recent = [
     ...recentPosts.map((p) => ({ key: `p${p.id}`, kind: "News", title: p.title, status: p.status, updatedAt: p.updatedAt, href: `/admin/posts/${p.id}/` })),
     ...recentEvents.map((e) => ({ key: `e${e.id}`, kind: "Event", title: e.title, status: e.status, updatedAt: e.updatedAt, href: `/admin/events/${e.id}/` })),
   ]
     .sort((a, b) => b.updatedAt.getTime() - a.updatedAt.getTime())
-    .slice(0, 8);
+    .slice(0, 6);
 
-  const live = home.published ? "on the homepage" : "homepage not published";
-  const stats = [
-    { label: "Published news & announcements", value: posts, href: "/admin/posts/?status=published", hint: `${drafts} draft${drafts === 1 ? "" : "s"}`, icon: "news", tone: "brand" },
-    { label: "Events & programmes", value: events, href: "/admin/events/", hint: `${upcoming} upcoming`, icon: "calendar", tone: "amber" },
-    { label: "Campaign posters", value: home.posters, href: "/admin/homepage/posters/", hint: live, icon: "poster", tone: "accent" },
-    { label: "Homepage banners", value: home.banners, href: "/admin/homepage/banners/", hint: live, icon: "banner", tone: "violet" },
-    { label: "Videos", value: home.videos, href: "/admin/homepage/videos/", hint: home.channelFill ? "chosen, plus newest from YouTube" : "chosen", icon: "video", tone: "accent" },
-    { label: "Gallery photos", value: gallery, href: "/admin/gallery/", hint: "from posts and events", icon: "gallery", tone: "emerald" },
-    { label: "Images in library", value: images, href: "/admin/media/?filter=images", hint: `${media} files in all`, icon: "image", tone: "sky" },
-    { label: "Pages", value: pages, href: "/admin/pages/", hint: `${leaders} leaders · ${documents} documents`, icon: "pages", tone: "brand" },
-  ] as const;
-  const attention = [
-    { label: "Awaiting review", value: pendingReview, href: "/admin/review/", icon: "review" },
-    { label: "New messages", value: newMessages, href: "/admin/inbox/", icon: "mail" },
-    { label: "Drafts", value: drafts, href: "/admin/posts/?status=draft", icon: "draft" },
-  ] as const;
-  const maxReview = Math.max(1, ...reviewByCode.map((r) => r.n));
+  const plural = (k: number, one: string, many = `${one}s`) => `${k} ${k === 1 ? one : many}`;
   const today = new Intl.DateTimeFormat("en-IN", { timeZone: "Asia/Kolkata", weekday: "long", day: "numeric", month: "long", year: "numeric" }).format(new Date());
 
+  // Most important first. Red is for things that block or confuse visitors; the rest are tidy-ups.
+  const needs: { tag: string; tone: keyof typeof TAG; title: string; text: string; action: string; href: string }[] = [
+    ...(pendingReview
+      ? [{ tag: "Client", tone: "soft" as const, title: `${plural(pendingReview, "decision is", "decisions are")} waiting`, text: "Nothing changes on the site until someone with authority decides.", action: "Open", href: "/admin/review/" }]
+      : []),
+    ...(oldUrls ? [{ tag: "Redirects", tone: "soft" as const, title: `${plural(oldUrls, "old address", "old addresses")} ${oldUrls === 1 ? "waits" : "wait"} for a decision`, text: "Visitors who open them today reach a missing page.", action: "Decide", href: "/admin/urls/" }] : []),
+    ...(newMessages ? [{ tag: "Inbox", tone: "red" as const, title: `${plural(newMessages, "new message")} from the Contact Us form`, text: "Someone is waiting for a reply.", action: "Read", href: "/admin/inbox/" }] : []),
+    ...(noAlt ? [{ tag: "Access", tone: "soft" as const, title: `${plural(noAlt, "image")} ${noAlt === 1 ? "has" : "have"} no alt text`, text: "Screen readers skip them. Describe them in the Library.", action: "Fix", href: "/admin/media/?filter=no-alt" }] : []),
+    ...(untitled ? [{ tag: "Story", tone: "grey" as const, title: `${plural(untitled, "published story has", "published stories have")} no title`, text: "It is live without a headline. Open it and add one.", action: "Open", href: "/admin/posts/" }] : []),
+    ...(drafts ? [{ tag: "Draft", tone: "blue" as const, title: `${plural(drafts, "draft")} not published yet`, text: "Finish and publish them, or delete the ones you no longer need.", action: "Open", href: "/admin/posts/?status=draft" }] : []),
+  ];
+
+  const start: { href: string; label: string; path: string; icon: AdminIconName; primary?: boolean }[] = [
+    { href: "/admin/posts/new/", label: "Write a story", path: "/gio-news/", icon: "news", primary: true },
+    { href: "/admin/events/new/", label: "Announce an event", path: "/gio-events/", icon: "calendar" },
+    { href: "/admin/gallery/", label: "Add photos", path: "/gallery/", icon: "gallery" },
+    { href: "/admin/homepage/banners/", label: "Swap a banner", path: "/", icon: "banner" },
+    ...(isEditor
+      ? [
+          { href: "/admin/leaders/new/", label: "Add a leader", path: "/team/", icon: "leaders" as const },
+          { href: "/admin/documents/", label: "Upload a PDF", path: "/documents/", icon: "documents" as const },
+        ]
+      : []),
+  ];
+
+  const site: { label: string; note: string; href: string }[] = [
+    { label: "Home page", note: `${home.banners} banners · ${home.posters} posters`, href: "/admin/homepage/" },
+    { label: "About Us", note: "/about-us/", href: pageHref("about-us") },
+    { label: "Leaders", note: `${plural(leaders, "person", "people")}`, href: "/admin/leaders/" },
+    { label: "News", note: `${posts} published · ${plural(drafts, "draft")}`, href: "/admin/posts/" },
+    { label: "Events", note: `${plural(events, "event")} · ${upcoming} upcoming`, href: "/admin/events/" },
+    { label: "Gallery", note: plural(gallery, "photo"), href: "/admin/gallery/" },
+    { label: "Documents", note: plural(documents, "PDF"), href: "/admin/documents/" },
+    { label: "Contact Us", note: plural(newMessages, "new message"), href: "/admin/inbox/" },
+  ];
+
   return (
-    <>
-      <section className="relative mb-5 overflow-hidden rounded-2xl bg-gradient-to-br from-brand-900 via-brand-800 to-brand-600 px-5 py-4 text-white shadow-md shadow-brand-900/20 sm:px-6">
-        <div aria-hidden className="pointer-events-none absolute -right-16 -top-24 h-56 w-56 rounded-full bg-brand-400/30 blur-3xl" />
-        <div aria-hidden className="pointer-events-none absolute -bottom-28 left-1/3 h-48 w-48 rounded-full bg-accent-500/25 blur-3xl" />
-        <div aria-hidden className="pointer-events-none absolute inset-0 bg-[radial-gradient(rgb(255_255_255/0.08)_1px,transparent_1px)] [background-size:18px_18px]" />
+    <div className="flex flex-col gap-10">
+      <section className="flex flex-col gap-3">
+        <p className="font-mono text-xs uppercase tracking-[0.08em] text-muted">{today}</p>
+        <h1 className="text-4xl font-bold leading-[1.05] tracking-tight text-brand-900 sm:text-5xl">
+          {greeting()}, {user.name}.
+        </h1>
+        <p className="max-w-[60ch] text-lg text-muted">
+          {pendingReview || newMessages || homeDraft?.unpublished
+            ? [
+                homeDraft?.unpublished ? "The home page has changes that are not live yet" : null,
+                pendingReview ? `${plural(pendingReview, "question")} still waiting on the client` : null,
+                newMessages ? plural(newMessages, "new message") : null,
+              ]
+                .filter(Boolean)
+                .join(", ") + "."
+            : "Nothing is waiting on you. Pick a job below to get started."}
+        </p>
+      </section>
 
-        <div className="relative flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
-          <div className="max-w-xl">
-            <p className="text-[11px] font-semibold uppercase tracking-[0.16em] text-brand-200">{today}</p>
-            <h1 className="mt-1 text-xl font-bold tracking-tight sm:text-2xl">
-              {greeting()}, {user.name}
-            </h1>
-            <p className="mt-0.5 text-sm text-brand-100">Here is what is happening on the GIO Kerala website.</p>
-            <div className="mt-3 flex flex-wrap gap-2">
-              <Link href="/admin/posts/new/" className="inline-flex items-center gap-1.5 rounded-lg bg-white px-3 py-1.5 text-sm font-semibold text-brand-800 shadow-sm transition hover:-translate-y-0.5 hover:shadow-md">
-                <Icon name="plus" className="h-4 w-4" /> New post
-              </Link>
-              <Link href="/admin/events/new/" className="inline-flex items-center gap-1.5 rounded-lg bg-white/10 px-3 py-1.5 text-sm font-semibold text-white ring-1 ring-inset ring-white/25 backdrop-blur transition hover:bg-white/20">
-                <Icon name="plus" className="h-4 w-4" /> New event
-              </Link>
-              <Link href="/admin/homepage/posters/" className="inline-flex items-center gap-1.5 rounded-lg bg-white/10 px-3 py-1.5 text-sm font-semibold text-white ring-1 ring-inset ring-white/25 backdrop-blur transition hover:bg-white/20">
-                <Icon name="poster" className="h-4 w-4" /> Homepage posters
-              </Link>
-            </div>
-          </div>
-
-          <div className="grid grid-cols-3 gap-2 lg:w-[22rem]">
-            {attention.map((a) => (
-              <Link key={a.label} href={a.href} className="group flex items-center gap-2.5 rounded-xl bg-white/10 px-3 py-2.5 ring-1 ring-inset ring-white/15 backdrop-blur transition hover:-translate-y-0.5 hover:bg-white/15">
-                <span className={`grid h-7 w-7 shrink-0 place-items-center rounded-lg ${a.value ? "bg-amber-400/20 text-amber-200" : "bg-emerald-400/20 text-emerald-200"}`}>
-                  <Icon name={a.value ? a.icon : "check"} className="h-4 w-4" />
-                </span>
-                <span className="min-w-0">
-                  <span className="block text-lg font-bold leading-tight tabular-nums">{a.value}</span>
-                  <span className="block truncate text-[11px] text-brand-100">{a.label}</span>
-                </span>
-              </Link>
-            ))}
-          </div>
+      <section aria-labelledby="start" className="flex flex-col gap-3.5">
+        <h2 id="start" className="text-xl font-semibold tracking-tight text-brand-900">
+          Start something
+        </h2>
+        <div className="grid grid-cols-2 gap-3 md:grid-cols-3 xl:grid-cols-6">
+          {start.map((t) => (
+            <Link
+              key={t.label}
+              href={t.href}
+              className={`group flex min-h-[8.5rem] flex-col justify-between gap-5 rounded-[1.125rem] border p-[1.125rem] transition-colors ${
+                t.primary ? "border-brand-600 bg-brand-600 text-white hover:bg-brand-700" : "border-line bg-white hover:border-brand-600"
+              }`}
+            >
+              <AdminIcon name={t.icon} className={`h-[26px] w-[26px] ${t.primary ? "text-white" : "text-brand-600"}`} />
+              <span>
+                <span className="block text-xl font-semibold leading-tight tracking-tight">{t.label}</span>
+                <span className={`font-mono text-xs ${t.primary ? "text-white/85" : "text-muted"}`}>{t.path}</span>
+              </span>
+            </Link>
+          ))}
         </div>
       </section>
 
-      <div className="mb-2 flex items-baseline justify-between">
-        <h2 className="text-xs font-semibold uppercase tracking-[0.14em] text-muted">Website at a glance</h2>
-      </div>
-      <div className="mb-5 grid grid-cols-2 gap-3 xl:grid-cols-4">
-        {stats.map((x) => (
-          <Link
-            key={x.label}
-            href={x.href}
-            className="group relative flex items-center gap-3 overflow-hidden rounded-xl border border-line bg-white p-3.5 shadow-sm transition duration-200 hover:-translate-y-0.5 hover:border-brand-200 hover:shadow-lg hover:shadow-brand-900/5"
-          >
-            <span aria-hidden className={`absolute inset-x-0 top-0 h-1 origin-left scale-x-0 bg-gradient-to-r transition duration-300 group-hover:scale-x-100 ${TONE[x.tone].bar}`} />
-            <span className={`grid h-9 w-9 shrink-0 place-items-center rounded-lg ring-1 ring-inset ${TONE[x.tone].icon}`}>
-              <Icon name={x.icon} className="h-4 w-4" />
-            </span>
-            <span className="min-w-0">
-              <span className="flex items-baseline gap-2">
-                <span className="text-xl font-bold leading-tight tracking-tight text-ink tabular-nums">{x.value.toLocaleString("en-IN")}</span>
-                <span className="truncate text-xs font-medium text-ink">{x.label}</span>
-              </span>
-              <span className="block truncate text-[11px] text-muted">{x.hint}</span>
-            </span>
-          </Link>
-        ))}
-      </div>
+      <div className="flex flex-wrap items-start gap-6">
+        <div className="flex min-w-0 flex-[999_1_36rem] flex-col gap-6">
+          <Panel title="Needs you">
+            {needs.length ? (
+              <ul>
+                {needs.map((x) => (
+                  <li key={x.title}>
+                    <Link href={x.href} className="flex items-start gap-3.5 rounded-2xl px-4 py-3.5 transition-colors hover:bg-brand-50">
+                      <span className={`mt-0.5 shrink-0 rounded-full px-2.5 py-0.5 text-xs font-bold ${TAG[x.tone]}`}>{x.tag}</span>
+                      <span className="min-w-0 flex-1">
+                        <strong className="block font-semibold text-ink">{x.title}</strong>
+                        <span className="text-muted">{x.text}</span>
+                      </span>
+                      <span className="shrink-0 font-semibold text-brand-700">{x.action} →</span>
+                    </Link>
+                  </li>
+                ))}
+              </ul>
+            ) : (
+              <p className="px-4 py-6 text-muted">All clear. Nothing needs you right now.</p>
+            )}
+          </Panel>
 
-      <div className="grid gap-4 lg:grid-cols-5">
-        <Panel
-          title="Waiting for client review"
-          icon="review"
-          className="lg:col-span-2"
-          aside={<span className="rounded-full bg-amber-50 px-2.5 py-0.5 text-xs font-semibold text-amber-800 ring-1 ring-inset ring-amber-200">{pendingReview} pending</span>}
-          footer={
-            <Link href="/admin/review/" className="inline-flex items-center gap-1 text-sm font-semibold text-brand-700 hover:text-accent-600">
-              Open review queue <Icon name="arrow" className="h-4 w-4" />
-            </Link>
-          }
-        >
-          {reviewByCode.length ? (
-            <ul className="space-y-2 py-1 text-sm">
-              {reviewByCode.map((r) => (
-                <li key={r.code}>
-                  <Link href={`/admin/review/?code=${encodeURIComponent(r.code)}`} className="group block">
-                    <div className="mb-0.5 flex items-center justify-between">
-                      <span className="font-medium text-ink group-hover:text-brand-700">{r.code}</span>
-                      <span className="text-xs font-semibold tabular-nums text-muted">{r.n}</span>
-                    </div>
-                    <div className="h-1.5 overflow-hidden rounded-full bg-paper">
-                      <div className="h-full rounded-full bg-gradient-to-r from-amber-400 to-amber-300 transition group-hover:from-amber-500" style={{ width: `${Math.max(4, (r.n / maxReview) * 100)}%` }} />
-                    </div>
+          <Panel
+            title="Ready to go live"
+            aside={
+              homeDraft?.unpublished && isEditor ? (
+                <Link href="/admin/homepage/" className="inline-flex h-11 items-center rounded-full bg-brand-600 px-5 text-sm font-bold text-white transition-colors hover:bg-brand-700">
+                  Review and publish
+                </Link>
+              ) : null
+            }
+          >
+            <div className="px-4 pb-4">
+              {homeDraft ? (
+                <p className="mb-3 text-muted">
+                  {homeDraft.current ? `Visitors see the version published on ${fmtDate(homeDraft.current.publishedAt, true)}.` : "The home page has never been published, so visitors see nothing for it yet."}
+                </p>
+              ) : null}
+              <ol className="flex flex-col">
+                {homeDraft?.unpublished ? (
+                  <li className="flex items-baseline gap-3.5 border-t border-line py-3">
+                    <span className="w-28 shrink-0 font-mono text-xs uppercase tracking-wide text-muted">Home page</span>
+                    <span className="flex-1">Edited and not published yet</span>
+                    <Link href="/admin/homepage/" className="font-semibold text-brand-700">
+                      Open →
+                    </Link>
+                  </li>
+                ) : (
+                  <li className="border-t border-line py-3 text-muted">Nothing is waiting. Everything you edited is live.</li>
+                )}
+              </ol>
+            </div>
+          </Panel>
+
+          <Panel title="Recently updated news and events" aside={<Link href="/admin/posts/" className="text-sm font-semibold text-brand-700">All stories →</Link>}>
+            <ul className="pb-2">
+              {recent.map((p) => (
+                <li key={p.key}>
+                  <Link href={p.href} className="group flex items-center gap-3 rounded-2xl px-4 py-2.5 transition-colors hover:bg-brand-50">
+                    <span className={`grid h-9 w-9 shrink-0 place-items-center rounded-xl ${p.kind === "News" ? "bg-brand-100 text-brand-700" : "bg-accent-600/10 text-accent-700"}`}>
+                      <AdminIcon name={p.kind === "News" ? "news" : "calendar"} className="h-[18px] w-[18px]" />
+                    </span>
+                    <span className="min-w-0 flex-1">
+                      <span className="block truncate font-medium text-ink">{p.title || "(no title)"}</span>
+                      <span className="text-xs text-muted">
+                        {p.kind} · {fmtDate(p.updatedAt)}
+                      </span>
+                    </span>
+                    <Badge value={p.status} />
                   </Link>
                 </li>
               ))}
             </ul>
-          ) : (
-            <p className="flex items-center gap-2 py-6 text-sm text-muted">
-              <Icon name="check" className="h-4 w-4 text-emerald-600" /> Nothing is waiting for review.
-            </p>
-          )}
-        </Panel>
+          </Panel>
+        </div>
 
-        <Panel title="Recently updated news and events" icon="news" className="lg:col-span-3">
-          <ul className="-mx-2 text-sm">
-            {recent.map((p) => (
-              <li key={p.key}>
-                <Link href={p.href} className="group flex items-center gap-3 rounded-lg px-2 py-1.5 transition hover:bg-paper">
-                  <span className={`grid h-7 w-7 shrink-0 place-items-center rounded-md ring-1 ring-inset ${p.kind === "News" ? TONE.brand.icon : TONE.amber.icon}`}>
-                    <Icon name={p.kind === "News" ? "news" : "calendar"} className="h-3.5 w-3.5" />
-                  </span>
-                  <span className="min-w-0 flex-1">
-                    <span className="block truncate font-medium text-ink group-hover:text-brand-700">{p.title || "(no title)"}</span>
-                    <span className="text-xs text-muted">
-                      {p.kind} · {fmtDate(p.updatedAt)}
-                    </span>
-                  </span>
-                  <Badge value={p.status} />
-                </Link>
-              </li>
-            ))}
-          </ul>
-        </Panel>
-
-        <Panel title="Recent admin activity" icon="pulse" className="lg:col-span-5">
-          {activity.length ? (
-            <ol className="relative py-1 text-sm before:absolute before:bottom-4 before:left-[5px] before:top-4 before:w-px before:bg-line">
-              {activity.map((a) => (
-                <li key={a.id} className="relative flex justify-between gap-4 py-1.5 pl-7">
-                  <span aria-hidden className={`absolute left-0 top-3 h-[11px] w-[11px] rounded-full ring-4 ${ACTION_DOT[a.action] ?? "bg-slate-400 ring-slate-100"}`} />
-                  <span className="min-w-0">
-                    <span className="font-semibold capitalize text-ink">{a.action.replaceAll("_", " ")}</span>{" "}
-                    <span className="text-ink">
-                      {a.entityType} #{a.entityId}
-                    </span>
-                    {a.summary ? <span className="text-muted"> · {a.summary}</span> : null}
-                  </span>
-                  <span className="shrink-0 text-xs tabular-nums text-muted">{fmtDate(a.createdAt, true)}</span>
+        <div className="flex min-w-0 flex-[1_1_21rem] flex-col gap-6">
+          <Panel title="Your site">
+            <ul className="pb-2">
+              {site.map((x) => (
+                <li key={x.label}>
+                  <Link href={x.href} className="flex items-baseline gap-2.5 rounded-xl px-4 py-2.5 transition-colors hover:bg-brand-50">
+                    <strong className="flex-1">{x.label}</strong>
+                    <span className="text-sm text-muted">{x.note}</span>
+                  </Link>
                 </li>
               ))}
-            </ol>
-          ) : (
-            <p className="py-6 text-sm text-muted">No changes made in the admin yet.</p>
-          )}
-        </Panel>
+            </ul>
+          </Panel>
+
+          <Panel title="Earlier today">
+            <div className="px-4 pb-4">
+              {activity.length ? (
+                <ol className="relative flex flex-col gap-3.5 py-1 before:absolute before:bottom-3 before:left-[5px] before:top-3 before:w-px before:bg-line">
+                  {activity.map((a) => (
+                    <li key={a.id} className="relative flex justify-between gap-3 pl-7 text-sm">
+                      <span aria-hidden className={`absolute left-0 top-1.5 h-[11px] w-[11px] rounded-full ring-4 ${ACTION_DOT[a.action] ?? "bg-slate-400 ring-slate-100"}`} />
+                      <span className="min-w-0">
+                        <span className="font-semibold capitalize text-ink">{a.action.replaceAll("_", " ")}</span>{" "}
+                        <span className="text-ink">
+                          {a.entityType} #{a.entityId}
+                        </span>
+                        {a.summary ? <span className="text-muted"> · {a.summary}</span> : null}
+                      </span>
+                      <span className="shrink-0 font-mono text-xs tabular-nums text-muted">{fmtDate(a.createdAt, true)}</span>
+                    </li>
+                  ))}
+                </ol>
+              ) : (
+                <p className="py-4 text-muted">No changes made in the admin yet.</p>
+              )}
+            </div>
+          </Panel>
+        </div>
       </div>
-    </>
+    </div>
   );
 }

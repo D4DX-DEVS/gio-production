@@ -24,7 +24,7 @@ export function VideoField({ defaultValue = "", required = true }: { defaultValu
           }}
         />
       </label>
-      {value && !id ? <p className="text-xs font-medium text-accent-700">This is not a YouTube video link.</p> : null}
+      {value && !id ? <p className="text-xs font-medium text-danger-700">This is not a YouTube video link.</p> : null}
       {id ? (
         <div className="relative aspect-video overflow-hidden rounded-lg bg-brand-900 ring-1 ring-line">
           {playing ? (
@@ -40,7 +40,7 @@ export function VideoField({ defaultValue = "", required = true }: { defaultValu
             <button type="button" onClick={() => setPlaying(true)} className="group absolute inset-0" aria-label="Play preview">
               {/* eslint-disable-next-line @next/next/no-img-element */}
               <img src={`https://i.ytimg.com/vi/${id}/hqdefault.jpg`} alt="" className="h-full w-full object-cover" />
-              <span className="absolute inset-0 m-auto flex h-12 w-16 items-center justify-center rounded-xl bg-accent-600 text-white shadow-lg transition group-hover:scale-110">
+              <span className="absolute inset-0 m-auto flex h-12 w-16 items-center justify-center rounded-xl bg-danger-600 text-white shadow-lg transition group-hover:scale-110">
                 <svg viewBox="0 0 24 24" className="h-6 w-6" fill="currentColor" aria-hidden>
                   <path d="M8 5v14l11-7z" />
                 </svg>

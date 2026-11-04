@@ -26,7 +26,7 @@ export function ContactForm({ heading, fields, submitLabel }: { heading?: string
           <div key={f.name} className={f.type === "textarea" ? "sm:col-span-2" : ""}>
             <label htmlFor={`c-${f.name}`} className="mb-1 block text-sm font-semibold text-ink">
               {f.label}
-              {f.required && <span className="text-accent-600"> *</span>}
+              {f.required && <span className="text-danger-600"> *</span>}
             </label>
             {f.type === "textarea" ? (
               <textarea id={`c-${f.name}`} name={f.name} required={f.required} rows={4} placeholder={f.label} className={`${input} resize-y`} maxLength={5000} />

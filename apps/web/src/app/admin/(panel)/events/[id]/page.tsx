@@ -17,7 +17,7 @@ export default async function EditEvent({ params }: { params: Promise<{ id: stri
   if (!event) notFound();
   return (
     <>
-      <PageHeader
+      <PageHeader icon="calendar" back={{ href: "/admin/events/", label: "Events" }}
         title={event.title}
         actions={
           <>

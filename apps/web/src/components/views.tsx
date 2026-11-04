@@ -102,7 +102,7 @@ function LeaderGrid({ leaders, compact = false, featuredFirst = false }: { leade
 function LeaderCard({ l, large = false }: { l: Awaited<ReturnType<typeof getLeaderGroups>>[number]["leaders"][number]; large?: boolean }) {
   return (
     <article className="card-lift group h-full overflow-hidden rounded-2xl border border-line bg-white text-center shadow-card hover:border-brand-200">
-      <div className={`aspect-square overflow-hidden bg-brand-50 ${l.photo ? "skeleton" : ""}`}>
+      <div className={`lit aspect-square overflow-hidden bg-brand-50 ${l.photo ? "skeleton" : ""}`}>
         <Img media={l.photo} alt={l.name} className="zoom-media reveal-img h-full w-full object-cover object-top" fallbackLabel={`No photo published for ${l.name}`} />
       </div>
       <div className={large ? "p-3.5 sm:p-4" : "p-2.5 sm:p-3"}>
@@ -254,7 +254,7 @@ export async function PostPage({ slug }: { slug: string }) {
       <Container className="max-w-4xl py-7 sm:py-10">
         <LightboxScope>
           {card.image && (
-            <figure className="group relative mx-auto -mt-14 mb-7 w-fit overflow-hidden rounded-2xl shadow-xl shadow-brand-900/20 ring-1 ring-line sm:-mt-16">
+            <figure className="lit group relative mx-auto -mt-14 mb-7 w-fit overflow-hidden rounded-2xl shadow-xl shadow-brand-900/20 ring-1 ring-line sm:-mt-16">
               <Img media={card.image} eager className="zoom-media h-auto max-h-[64vh] w-auto max-w-full" />
             </figure>
           )}

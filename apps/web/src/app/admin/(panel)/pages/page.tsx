@@ -3,22 +3,26 @@ import { asc, isNull, sql } from "drizzle-orm";
 import { schema } from "@gio/db";
 import { getDb } from "@/lib/db";
 import { encodePath } from "@/lib/content";
-import { requireRole } from "@/lib/admin/guard";
+import { hasRole, requireRole } from "@/lib/admin/guard";
 import { fmtDate } from "@/lib/admin/form";
-import { Badge, PageHeader, Table } from "@/lib/admin/ui";
+import { AdminIcon } from "@/lib/admin/icons";
+import { ConfirmButton } from "@/lib/admin/client";
+import { Badge, PageHeader, RowActions, Table } from "@/lib/admin/ui";
+import { deletePage } from "./actions";
 
-export const metadata = { title: "Pages" };
+export const metadata = { title: "All pages" };
 
 const TEMPLATE_LABEL: Record<string, string> = {
   sections: "Sections",
   leaders: "Leaders list",
-  post_listing: "Post listing",
+  post_listing: "News list",
   contact: "Contact",
   embed: "Embed",
 };
 
 export default async function PagesPage() {
-  await requireRole("contributor");
+  const { user } = await requireRole("contributor");
+  const isAdmin = hasRole(user, "admin");
   const p = schema.pages;
   const rows = await getDb()
     .select({
@@ -37,7 +41,18 @@ export default async function PagesPage() {
 
   return (
     <>
-      <PageHeader title="Pages & homepage" description="The homepage and fixed pages. Section pages are edited as a draft and go live when you click Publish." />
+      <PageHeader
+        title="All pages"
+        icon="pages"
+        description="The home page and every fixed page of the website. Section pages are edited as a draft and go live when you click Publish."
+        actions={
+          isAdmin ? (
+            <Link href="/admin/pages/new/" className="btn btn-primary">
+              <AdminIcon name="plus" className="h-4 w-4" /> Add page
+            </Link>
+          ) : null
+        }
+      />
       <Table>
         <thead>
           <tr>
@@ -49,34 +64,43 @@ export default async function PagesPage() {
           </tr>
         </thead>
         <tbody>
-          {rows.map((r) => (
-            <tr key={r.id}>
-              <td>
-                <Link href={`/admin/pages/${r.id}/`} className="font-medium text-ink hover:text-brand-700 hover:underline">
-                  {r.slug === "" ? "Homepage" : r.title}
-                </Link>
-                <div className="text-xs text-muted">{r.slug === "" ? "/" : `/${r.slug}/`}</div>
-              </td>
-              <td className="text-muted">
-                {TEMPLATE_LABEL[r.template] ?? r.template}
-                {r.sectionCount ? ` · ${r.sectionCount} sections` : ""}
-              </td>
-              <td>
-                <Badge value={r.status} />
-              </td>
-              <td className="whitespace-nowrap text-muted">{r.publishedAt ? fmtDate(r.publishedAt, true) : "—"}</td>
-              <td className="whitespace-nowrap text-right">
-                <a href={r.slug === "" ? "/" : `/${encodePath(r.slug)}/`} target="_blank" className="text-sm text-brand-700 hover:underline">
-                  View ↗
-                </a>
-              </td>
-            </tr>
-          ))}
+          {rows.map((r) => {
+            const removable = isAdmin && r.slug !== "" && (r.template === "sections" || r.template === "embed");
+            return (
+              <tr key={r.id}>
+                <td>
+                  <Link href={`/admin/pages/${r.id}/`} className="font-medium text-ink hover:text-brand-700 hover:underline">
+                    {r.slug === "" ? "Home page" : r.title}
+                  </Link>
+                  <div className="text-xs text-muted">{r.slug === "" ? "/" : `/${r.slug}/`}</div>
+                </td>
+                <td className="text-muted">
+                  {TEMPLATE_LABEL[r.template] ?? r.template}
+                  {r.sectionCount ? ` · ${r.sectionCount} sections` : ""}
+                </td>
+                <td>
+                  <Badge value={r.status} />
+                </td>
+                <td className="whitespace-nowrap text-muted">{r.publishedAt ? fmtDate(r.publishedAt, true) : "—"}</td>
+                <td>
+                  <RowActions editHref={`/admin/pages/${r.id}/`} viewHref={r.slug === "" ? "/" : `/${encodePath(r.slug)}/`}>
+                    {removable ? (
+                      <form action={deletePage.bind(null, r.id)}>
+                        <ConfirmButton className="btn btn-sm btn-danger" message={`Delete the page “${r.title}”? It disappears from the website. Links to it in menus will stop working.`}>
+                          <AdminIcon name="trash" className="h-3.5 w-3.5" /> Delete
+                        </ConfirmButton>
+                      </form>
+                    ) : null}
+                  </RowActions>
+                </td>
+              </tr>
+            );
+          })}
         </tbody>
       </Table>
       <p className="mt-4 text-sm text-muted">
-        Leader pages list the people from <Link href="/admin/leaders/" className="text-brand-700 underline">Leaders</Link>; post listing pages show{" "}
-        <Link href="/admin/posts/" className="text-brand-700 underline">Posts</Link> from their category.
+        Leader pages list the people from <Link href="/admin/leaders/" className="text-brand-700 underline">Leaders</Link>; news list pages show{" "}
+        <Link href="/admin/posts/" className="text-brand-700 underline">News</Link> from their category. Built-in pages can be set to Draft to hide them, but not deleted.
       </p>
     </>
   );

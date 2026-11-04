@@ -62,7 +62,7 @@ export default async function ReviewPage({ searchParams }: { searchParams: Promi
 
   return (
     <>
-      <PageHeader
+      <PageHeader icon="review"
         title="Review queue"
         description="Questions for the client. Everything was imported exactly as published on the old site. Nothing changes until someone with authority decides. Corrections must come from the client; the system never guesses them."
       />

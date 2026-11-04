@@ -1,7 +1,7 @@
 // Section pages are edited as draft rows (sections, section_items) and published as one JSON
 // snapshot in published_layouts (05 §8.1). The public site reads only the current snapshot.
 // The importer and the admin "Publish" action both use publishPageLayout, so they produce the same shape.
-import { and, asc, eq, inArray } from "drizzle-orm";
+import { and, asc, eq, inArray, or } from "drizzle-orm";
 import type { Db } from "./index";
 import { media, publishedLayouts, sectionItems, sections, type SectionType } from "./schema/content";
 
@@ -54,7 +54,9 @@ export async function buildPageLayout(db: Db, pageId: number): Promise<PageLayou
   const secs = await db
     .select()
     .from(sections)
-    .where(and(eq(sections.pageId, pageId), eq(sections.isVisible, true)))
+    // A hidden "latest news" row stays in the snapshot (flagged data.hidden) so the homepage can tell
+    // "news hidden on purpose" from "no news row, use the default place".
+    .where(and(eq(sections.pageId, pageId), or(eq(sections.isVisible, true), eq(sections.type, "latest_posts"))))
     .orderBy(asc(sections.sort), asc(sections.id));
   const items = secs.length
     ? await db
@@ -74,7 +76,7 @@ export async function buildPageLayout(db: Db, pageId: number): Promise<PageLayou
       id: s.id,
       type: s.type,
       title: s.title,
-      data: JSON.parse(s.dataJson) as Record<string, unknown>,
+      data: s.isVisible ? (JSON.parse(s.dataJson) as Record<string, unknown>) : { ...(JSON.parse(s.dataJson) as Record<string, unknown>), hidden: true },
       startsAt: s.startsAt?.getTime() ?? null,
       endsAt: s.endsAt?.getTime() ?? null,
       items: items

@@ -4,6 +4,7 @@
 import { useRouter, useSearchParams, usePathname } from "next/navigation";
 import { useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import { useFormStatus } from "react-dom";
+import { EyeIcon, EyeOffIcon } from "@/components/Icons";
 import { LIMITS } from "./files";
 
 const IMAGE_TYPES = ["image/jpeg", "image/png", "image/gif", "image/webp"];
@@ -19,6 +20,76 @@ function fileProblem(f: File, accept: keyof typeof ACCEPT): string | null {
   const max = isPdf ? LIMITS.document : LIMITS.image;
   if (f.size > max) return `${f.name} is ${(f.size / 1048576).toFixed(1)} MB; the limit is ${max / 1048576} MB.`;
   return null;
+}
+
+/** Password input with an eye button that switches between hidden and visible text. */
+export function PasswordInput({ id, name, autoComplete, required = false }: { id?: string; name: string; autoComplete?: string; required?: boolean }) {
+  const [shown, setShown] = useState(false);
+  return (
+    <div className="relative">
+      <input id={id} name={name} type={shown ? "text" : "password"} required={required} autoComplete={autoComplete} spellCheck={false} className="field field-with-action" />
+      <button
+        type="button"
+        onClick={() => setShown((s) => !s)}
+        aria-label={shown ? "Hide password" : "Show password"}
+        aria-pressed={shown}
+        title={shown ? "Hide password" : "Show password"}
+        className="absolute inset-y-0 right-0 flex w-11 cursor-pointer items-center justify-center rounded-r-lg text-muted transition-colors hover:text-brand-700 focus-visible:text-brand-700 focus-visible:outline-2 focus-visible:outline-brand-400"
+      >
+        {shown ? <EyeOffIcon className="h-5 w-5" /> : <EyeIcon className="h-5 w-5" />}
+      </button>
+    </div>
+  );
+}
+
+/** Textarea for HTML with a small toolbar, so editors do not have to type tags by hand. */
+type EditorTool = "bold" | "italic" | "heading" | "paragraph" | "link" | "list" | "quote";
+const EDITOR_TOOLS: { id: EditorTool; label: string; title: string; className?: string }[] = [
+  { id: "bold", label: "B", title: "Bold", className: "font-bold" },
+  { id: "italic", label: "I", title: "Italic", className: "italic" },
+  { id: "heading", label: "H2", title: "Heading" },
+  { id: "paragraph", label: "¶", title: "Paragraph" },
+  { id: "link", label: "Link", title: "Link" },
+  { id: "list", label: "• List", title: "Bulleted list" },
+  { id: "quote", label: "“ ”", title: "Quote" },
+];
+
+export function HtmlEditor({ name, defaultValue = "", rows = 18, disabled = false }: { name: string; defaultValue?: string; rows?: number; disabled?: boolean }) {
+  const ref = useRef<HTMLTextAreaElement>(null);
+  const apply = (tool: EditorTool) => {
+    const el = ref.current;
+    if (!el) return;
+    const wrap = (before: string, after: string, placeholder: string) => {
+      const selected = el.value.slice(el.selectionStart, el.selectionEnd) || placeholder;
+      el.focus();
+      el.setRangeText(before + selected + after, el.selectionStart, el.selectionEnd, "select");
+    };
+    if (tool === "bold") wrap("<strong>", "</strong>", "bold text");
+    else if (tool === "italic") wrap("<em>", "</em>", "italic text");
+    else if (tool === "heading") wrap("<h2>", "</h2>", "Heading");
+    else if (tool === "paragraph") wrap("<p>", "</p>", "Write here");
+    else if (tool === "list") wrap("<ul>\n  <li>", "</li>\n</ul>", "item");
+    else if (tool === "quote") wrap("<blockquote>", "</blockquote>", "quote");
+    else {
+      const url = window.prompt("Link address, for example https://example.org or /about-us/");
+      if (url) wrap(`<a href="${url.replaceAll('"', "&quot;")}">`, "</a>", "link text");
+    }
+  };
+  return (
+    <div>
+      {disabled ? null : (
+        <div className="flex flex-wrap items-center gap-1 rounded-t-[0.6rem] border border-b-0 border-[#cfd8e3] bg-paper px-2 py-1.5" role="toolbar" aria-label="Formatting">
+          {EDITOR_TOOLS.map((t) => (
+            <button key={t.id} type="button" title={t.title} onClick={() => apply(t.id)} className={`rounded-md px-2.5 py-1 text-sm text-slate-700 transition-colors hover:bg-white hover:text-brand-700 hover:shadow-sm ${t.className ?? ""}`}>
+              {t.label}
+            </button>
+          ))}
+          <span className="ml-auto pr-1 text-[11px] uppercase tracking-wide text-slate-400">HTML</span>
+        </div>
+      )}
+      <textarea ref={ref} name={name} rows={rows} defaultValue={defaultValue} disabled={disabled} className={`field font-mono text-sm leading-relaxed ${disabled ? "" : "rounded-t-none"}`} />
+    </div>
+  );
 }
 
 /** File input that previews chosen images and blocks the submit when a file is the wrong type or too big. */
@@ -43,7 +114,7 @@ export function FileInput({ name, accept = "any", multiple = false, required = f
           setFiles(list.map((f) => ({ name: f.name, size: f.size, url: IMAGE_TYPES.includes(f.type) ? URL.createObjectURL(f) : null })));
         }}
       />
-      {problem ? <p className="mt-1 text-xs font-medium text-accent-700">{problem}</p> : null}
+      {problem ? <p className="mt-1 text-xs font-medium text-danger-700">{problem}</p> : null}
       {files.length ? (
         <div className="mt-2 flex flex-wrap gap-2">
           {files.map((f) => (
@@ -157,7 +228,7 @@ export function Flash() {
   return (
     <div
       role="status"
-      className={`mb-5 flex items-start justify-between gap-4 rounded-lg px-4 py-3 text-sm ring-1 ${shown.error ? "bg-red-50 text-accent-700 ring-red-200" : "bg-green-50 text-green-800 ring-green-200"}`}
+      className={`mb-5 flex items-start justify-between gap-4 rounded-lg px-4 py-3 text-sm ring-1 ${shown.error ? "bg-red-50 text-danger-700 ring-red-200" : "bg-green-50 text-green-800 ring-green-200"}`}
     >
       <span>{msg}</span>
       <button type="button" className="font-semibold opacity-70 hover:opacity-100" onClick={() => setShown({ ok: null, error: null })} aria-label="Dismiss">
@@ -261,7 +332,7 @@ export function MediaPicker({
             Choose…
           </button>
           {id !== null ? (
-            <button type="button" className="text-left text-xs text-accent-700 hover:underline" onClick={() => setId(null)}>
+            <button type="button" className="text-left text-xs text-danger-700 hover:underline" onClick={() => setId(null)}>
               Remove
             </button>
           ) : null}
@@ -291,7 +362,7 @@ export function MediaPicker({
               <button type="button" className="btn btn-ghost" onClick={() => setOpen(false)}>
                 Close
               </button>
-              {uploadError ? <p className="w-full text-sm font-medium text-accent-700">{uploadError}</p> : null}
+              {uploadError ? <p className="w-full text-sm font-medium text-danger-700">{uploadError}</p> : null}
             </div>
             <div className="grid grid-cols-3 gap-3 overflow-y-auto p-4 sm:grid-cols-4 md:grid-cols-6">
               {filtered.slice(0, limit).map((o) => (

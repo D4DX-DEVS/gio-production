@@ -35,7 +35,7 @@ export default async function MediaItem({ params }: { params: Promise<{ id: stri
   const canEdit = hasRole(user, "editor");
   return (
     <>
-      <PageHeader
+      <PageHeader icon="image" back={{ href: "/admin/media/", label: "Media files" }}
         title={m.originalFilename}
         actions={
           <Link href="/admin/media/" className="btn btn-ghost">

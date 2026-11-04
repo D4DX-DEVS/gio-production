@@ -23,7 +23,7 @@ export async function homepageCounts(db: Db): Promise<HomepageCounts> {
   for (const sec of layout?.sections ?? []) {
     const withImage = sec.items.filter((i) => i.media).length;
     if (sec.type === "hero_carousel" || sec.type === "image_banner") out.banners += withImage;
-    if (sec.type === "poster_slider" || sec.type === "image") out.posters += withImage;
+    if (sec.type === "poster_slider" || (sec.type === "image" && sec.data.kind !== "about_poster")) out.posters += withImage;
     if (sec.type === "logo_carousel") out.logos += withImage;
     if (sec.type === "featured_video") {
       const chosen = sec.items.filter((i) => youtubeId(i.linkUrl)).length;

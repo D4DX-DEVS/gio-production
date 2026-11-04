@@ -8,7 +8,7 @@ export default async function NewPostPage() {
   const { user } = await requireRole("contributor");
   return (
     <>
-      <PageHeader title="New post" />
+      <PageHeader icon="news" back={{ href: "/admin/posts/", label: "News" }} title="Add news" />
       <PostForm user={user} />
     </>
   );

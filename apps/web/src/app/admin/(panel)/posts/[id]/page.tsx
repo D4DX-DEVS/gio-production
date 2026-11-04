@@ -22,7 +22,7 @@ export default async function EditPostPage({ params }: PageProps<"/admin/posts/[
   const cats = await db.select({ id: schema.postCategories.categoryId }).from(schema.postCategories).where(eq(schema.postCategories.postId, id));
   return (
     <>
-      <PageHeader
+      <PageHeader icon="news" back={{ href: "/admin/posts/", label: "News" }}
         title="Edit post"
         description={post.title}
         actions={

@@ -27,7 +27,7 @@ export default async function EventPage({ params }: PageProps<"/event/[slug]">) 
       <Container className="grid gap-6 py-8 sm:py-10 lg:grid-cols-[minmax(0,2fr)_minmax(0,1fr)] lg:gap-10">
         <LightboxScope>
           {image && (
-            <figure className="group mx-auto mb-6 w-fit overflow-hidden rounded-2xl shadow-lg shadow-brand-900/10 ring-1 ring-line">
+            <figure className="lit group mx-auto mb-6 w-fit overflow-hidden rounded-2xl shadow-lg shadow-brand-900/10 ring-1 ring-line">
               <Img media={image} eager className="zoom-media h-auto max-h-[64vh] w-auto max-w-full" />
             </figure>
           )}

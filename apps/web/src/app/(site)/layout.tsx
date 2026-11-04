@@ -1,6 +1,8 @@
+import { BackToTop } from "@/components/BackToTop";
 import { Footer } from "@/components/Footer";
 import { Header } from "@/components/Header";
 import { ImageLoadWatcher } from "@/components/ImageLoadWatcher";
+import { LightFx } from "@/components/LightFx";
 import { ScrollReveal } from "@/components/ScrollReveal";
 import { SplashScreen } from "@/components/SplashScreen";
 import { getMenu, getSiteInfo } from "@/lib/content";
@@ -20,6 +22,8 @@ export default async function SiteLayout({ children }: { children: React.ReactNo
       <Footer site={site} nav={nav} social={social} />
       <ImageLoadWatcher />
       <ScrollReveal />
+      <BackToTop />
+      <LightFx />
     </>
   );
 }

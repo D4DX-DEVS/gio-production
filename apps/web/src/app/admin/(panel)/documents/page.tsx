@@ -20,7 +20,7 @@ export default async function DocumentsPage() {
   const canEdit = hasRole(user, "editor");
   return (
     <>
-      <PageHeader title="Documents (PDFs)" description="Published documents are listed on the website's Documents page. Drafts stay hidden, but their files keep their old addresses." />
+      <PageHeader icon="documents" title="Documents (PDFs)" description="Published documents are listed on the website's Documents page. Drafts stay hidden, but their files keep their old addresses." />
       {canEdit ? (
         <Card title="Upload a PDF" className="mb-6">
           <form action="/admin/media-upload/" method="post" encType="multipart/form-data" className="grid gap-3 sm:grid-cols-[2fr_2fr_auto] sm:items-end">

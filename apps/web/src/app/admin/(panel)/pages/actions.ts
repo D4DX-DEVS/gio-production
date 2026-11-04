@@ -277,3 +277,35 @@ export async function publishPage(pageId: number, fd?: FormData) {
   });
   done(back, "Published. The website now shows these sections.");
 }
+
+/** New, empty section page. It starts as a draft, so nothing appears on the website until it is published. */
+export async function createPage(fd: FormData) {
+  const { user } = await requireRole("admin");
+  const back = "/admin/pages/new/";
+  let newId = 0;
+  await attempt(back, async () => {
+    const title = req(fd, "title", "Title");
+    const slug = slugify(str(fd, "slug") ?? title);
+    if (!slug) throw new FormError("Address is empty. Type one using letters or numbers.");
+    const [taken] = await getDb().select({ id: pages.id }).from(pages).where(eq(pages.slug, slug)).limit(1);
+    if (taken) throw new FormError(`The address /${slug}/ is already used by another page.`);
+    const [row] = await getDb().insert(pages).values({ title, slug, template: "sections", status: "draft", source: "manual" }).returning({ id: pages.id });
+    newId = row.id;
+    await audit(user.id, "create", "page", newId, title);
+  });
+  done(editPath(newId), "Page created as a draft. Add sections below, then publish.");
+}
+
+/** Soft delete: the page leaves the website and the admin lists, its sections stay in the database. */
+export async function deletePage(pageId: number) {
+  const { user } = await requireRole("admin");
+  await attempt("/admin/pages/", async () => {
+    const [page] = await getDb().select().from(pages).where(eq(pages.id, pageId)).limit(1);
+    if (!page) throw new FormError("Page not found.");
+    if (page.slug === "") throw new FormError("The homepage cannot be deleted.");
+    if (page.template !== "sections" && page.template !== "embed") throw new FormError("This page is built by the website itself (leaders, contact or news list) and cannot be deleted. Set it to Draft to hide it.");
+    await getDb().update(pages).set({ deletedAt: new Date(), updatedAt: new Date() }).where(eq(pages.id, pageId));
+    await audit(user.id, "delete", "page", pageId, page.title);
+  });
+  done("/admin/pages/", "Page moved to trash.");
+}

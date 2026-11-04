@@ -7,12 +7,22 @@ import { encodePath } from "@/lib/content";
 import type { AdminUser } from "@/lib/auth";
 import { hasRole } from "@/lib/admin/guard";
 import { toIstInput } from "@/lib/admin/form";
+import { AdminIcon } from "@/lib/admin/icons";
 import { mediaPreviews } from "@/lib/admin/media-options";
-import { ConfirmButton, MediaPicker, SubmitButton } from "@/lib/admin/client";
-import { Card, Field } from "@/lib/admin/ui";
+import { ConfirmButton, HtmlEditor, MediaPicker, SubmitButton } from "@/lib/admin/client";
+import { Card, ChipCheckbox, Field, FormActions, RadioCards } from "@/lib/admin/ui";
 import { deletePost, savePost } from "./actions";
 
 type Post = typeof schema.posts.$inferSelect;
+
+const STATUS_LABEL: Record<(typeof POST_STATUSES)[number], { label: string; hint: string }> = {
+  draft: { label: "Draft", hint: "Saved, not on the website" },
+  review: { label: "Ready for review", hint: "An editor checks it before it goes live" },
+  scheduled: { label: "Scheduled", hint: "Goes live on the publish date" },
+  published: { label: "Published", hint: "Visible on the website" },
+  private: { label: "Private", hint: "Only people who sign in can see it" },
+  archived: { label: "Archived", hint: "Hidden, kept for the record" },
+};
 
 export async function PostForm({ user, post, categoryIds = [] }: { user: AdminUser; post?: Post; categoryIds?: number[] }) {
   const db = getDb();
@@ -21,93 +31,99 @@ export async function PostForm({ user, post, categoryIds = [] }: { user: AdminUs
   const save = savePost.bind(null, post?.id ?? null);
 
   return (
-    <form action={save} className="grid gap-6 lg:grid-cols-[1fr_20rem]">
-      <div className="space-y-6">
-        <Card>
-          <div className="space-y-4">
-            <Field label="Title">
-              <input name="title" required defaultValue={post?.title} className="field text-lg" />
-            </Field>
-            <Field label="Slug (web address)" hint="Leave empty to make one from the title. Changing the slug of a published post breaks old links.">
-              <input name="slug" defaultValue={post?.slug} className="field font-mono text-sm" />
-            </Field>
-            <Field label="Excerpt" hint="Short summary shown on listing cards.">
-              <textarea name="excerpt" rows={3} defaultValue={post?.excerpt ?? ""} className="field" />
-            </Field>
-            <Field label="Body (HTML)" hint="Paragraphs as <p>…</p>. Unsafe tags and scripts are removed when saving.">
-              <textarea name="bodyHtml" rows={22} defaultValue={post?.bodyHtml ?? ""} className="field font-mono text-sm leading-relaxed" />
-            </Field>
-          </div>
-        </Card>
-        <Card title="Search engines">
-          <div className="grid gap-4">
-            <Field label="SEO title">
-              <input name="seoTitle" defaultValue={post?.seoTitle ?? ""} className="field" />
-            </Field>
-            <Field label="SEO description">
-              <textarea name="seoDescription" rows={2} defaultValue={post?.seoDescription ?? ""} className="field" />
-            </Field>
-          </div>
-        </Card>
-      </div>
+    <form action={save}>
+      <div className="grid gap-6 lg:grid-cols-[1fr_20rem]">
+        <div className="space-y-6">
+          <Card>
+            <div className="space-y-5">
+              <Field label="Headline">
+                <input name="title" required defaultValue={post?.title} className="field text-lg font-semibold" placeholder="What is this news about?" />
+              </Field>
+              <Field label="Short summary" hint="Shown on the news cards, under the headline.">
+                <textarea name="excerpt" rows={3} defaultValue={post?.excerpt ?? ""} className="field" />
+              </Field>
+              <div>
+                <span className="label">Story</span>
+                <HtmlEditor name="bodyHtml" defaultValue={post?.bodyHtml ?? ""} rows={20} />
+                <span className="mt-1 block text-xs text-muted">Select text and use the buttons above to format it. Unsafe tags and scripts are removed when saving.</span>
+              </div>
+            </div>
+          </Card>
 
-      <div className="space-y-6">
-        <Card title="Publish">
-          <div className="space-y-4">
-            <Field label="Status">
-              <select name="status" defaultValue={post?.status ?? "draft"} className="field">
-                {statuses.map((s) => (
-                  <option key={s} value={s}>
-                    {s}
-                  </option>
-                ))}
-              </select>
-            </Field>
-            <Field label="Publish date (India time)" hint="Empty = now, when published.">
+          <details className="group rounded-2xl border border-line bg-white shadow-sm open:shadow-md">
+            <summary className="flex cursor-pointer list-none items-center justify-between gap-3 px-5 py-4 sm:px-6">
+              <span>
+                <span className="block text-base font-semibold text-brand-900">Web address and search engines</span>
+                <span className="block text-sm text-muted">Optional. The address is made from the headline if you leave it empty.</span>
+              </span>
+              <AdminIcon name="chevron" className="h-5 w-5 shrink-0 text-slate-400 transition-transform group-open:rotate-90" />
+            </summary>
+            <div className="grid gap-4 border-t border-line px-5 py-5 sm:px-6">
+              <Field label="Web address" hint="Changing the address of a published post breaks old links to it.">
+                <input name="slug" defaultValue={post?.slug} className="field font-mono text-sm" />
+              </Field>
+              <Field label="Search title">
+                <input name="seoTitle" defaultValue={post?.seoTitle ?? ""} className="field" />
+              </Field>
+              <Field label="Search description">
+                <textarea name="seoDescription" rows={2} defaultValue={post?.seoDescription ?? ""} className="field" />
+              </Field>
+            </div>
+          </details>
+        </div>
+
+        <div className="space-y-6">
+          <Card title="Status">
+            <RadioCards name="status" defaultValue={post?.status ?? "draft"} options={statuses.map((s) => ({ value: s, ...STATUS_LABEL[s] }))} />
+            <Field label="Publish date (India time)" hint="Leave empty to use the moment it is published." className="mt-4">
               <input type="datetime-local" name="publishedAt" defaultValue={toIstInput(post?.publishedAt)} className="field" />
             </Field>
-            <div className="flex flex-wrap gap-2">
-              <SubmitButton>{post ? "Save changes" : "Create post"}</SubmitButton>
-              {post?.status === "published" ? (
-                <a href={`/${encodePath(post.slug)}/`} target="_blank" className="btn btn-ghost">
-                  View ↗
-                </a>
-              ) : null}
-            </div>
-            {post && hasRole(user, "admin") ? (
-              <div className="border-t border-line pt-4">
-                <ConfirmButton formAction={deletePost.bind(null, post.id)} message="Move this post to the trash? It will disappear from the website.">
-                  Delete post
-                </ConfirmButton>
+          </Card>
+          <Card title="Photo">
+            <MediaPicker
+              name="featuredMediaId"
+              defaultId={post?.featuredMediaId}
+              preview={post?.featuredMediaId ? previews.get(post.featuredMediaId) : null}
+              label="Shown on cards, in the gallery and at the top"
+            />
+          </Card>
+          {categories.length ? (
+            <Card title="Categories" description="Choose where it appears.">
+              <div className="flex flex-wrap gap-2">
+                {categories.map((c) => (
+                  <ChipCheckbox key={c.id} name="categories" value={c.id} label={c.name} defaultChecked={categoryIds.includes(c.id)} />
+                ))}
               </div>
-            ) : null}
-          </div>
-        </Card>
-        <Card title="Featured image">
-          <MediaPicker
-            name="featuredMediaId"
-            defaultId={post?.featuredMediaId}
-            preview={post?.featuredMediaId ? previews.get(post.featuredMediaId) : null}
-            label="Image shown on cards and at the top"
-          />
-        </Card>
-        <Card title="Categories">
-          <div className="max-h-64 space-y-1.5 overflow-y-auto text-sm">
-            {categories.map((c) => (
-              <label key={c.id} className="flex items-center gap-2">
-                <input type="checkbox" name="categories" value={c.id} defaultChecked={categoryIds.includes(c.id)} />
-                {c.name}
-              </label>
-            ))}
-          </div>
-        </Card>
-        {post ? (
-          <p className="text-xs text-muted">
-            Source: {post.source}
-            {post.legacyWpId ? ` · WordPress #${post.legacyWpId}` : ""} · <Link href="/admin/posts/" className="underline">Back to list</Link>
-          </p>
-        ) : null}
+            </Card>
+          ) : null}
+          {post ? (
+            <p className="px-1 text-xs text-muted">
+              Source: {post.source}
+              {post.legacyWpId ? ` · WordPress #${post.legacyWpId}` : ""}
+            </p>
+          ) : null}
+        </div>
       </div>
+
+      <FormActions
+        aside={
+          post && hasRole(user, "admin") ? (
+            <ConfirmButton formAction={deletePost.bind(null, post.id)} message="Move this post to the trash? It will disappear from the website.">
+              <AdminIcon name="trash" className="h-4 w-4" /> Delete
+            </ConfirmButton>
+          ) : null
+        }
+      >
+        {post?.status === "published" ? (
+          <a href={`/${encodePath(post.slug)}/`} target="_blank" className="btn btn-ghost">
+            View on website <AdminIcon name="external" className="h-4 w-4" />
+          </a>
+        ) : null}
+        <Link href="/admin/posts/" className="btn btn-quiet">
+          Cancel
+        </Link>
+        <SubmitButton>{post ? "Save changes" : "Create news"}</SubmitButton>
+      </FormActions>
     </form>
   );
 }

@@ -57,7 +57,7 @@ export default async function SettingsPage() {
   const [contactPage] = await db.select({ id: s.pages.id }).from(s.pages).where(eq(s.pages.slug, "contact-us"));
   return (
     <>
-      <PageHeader title="Site settings" description="Shown in the header, footer and contact details across the site." />
+      <PageHeader icon="settings" title="Site settings" description="Shown in the header, footer and contact details across the site." />
       <form action={saveSettings} className="grid gap-6 lg:grid-cols-3">
         <Card className="space-y-4 lg:col-span-2">
           {TEXT_SETTINGS.map((t) => (

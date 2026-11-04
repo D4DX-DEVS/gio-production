@@ -44,14 +44,17 @@ export async function ChannelVideos({
       <Container className="relative">
         <div className="reveal mb-5 flex flex-wrap items-end justify-between gap-3 sm:mb-6">
           <div>
-            <p className="mb-1 text-xs font-semibold uppercase tracking-[0.18em] text-accent-500 sm:text-[0.8125rem]">GIO Kerala on YouTube</p>
+            <p className="mb-1 flex items-center gap-2 text-xs font-semibold uppercase tracking-[0.18em] text-accent-500 sm:text-[0.8125rem]">
+              <span aria-hidden className="reveal-line h-0.5 w-6 origin-left rounded-full bg-accent-500" />
+              GIO Kerala on YouTube
+            </p>
             <h2 className="font-display text-[1.375rem] font-bold leading-tight sm:text-[1.625rem] lg:text-[1.875rem]">{title}</h2>
           </div>
           <a
             href={CHANNEL_URL}
             target="_blank"
             rel="noopener noreferrer"
-            className="btn-fx inline-flex items-center gap-2 rounded-full bg-white/10 px-5 py-2 text-[0.9375rem] font-semibold ring-1 ring-white/20 hover:bg-accent-600 hover:ring-accent-600"
+            className="btn-fx shine inline-flex items-center gap-2 rounded-full bg-white/10 px-5 py-2 text-[0.9375rem] font-semibold ring-1 ring-white/20 hover:bg-accent-600 hover:ring-accent-600"
           >
             Visit our channel
             <svg viewBox="0 0 24 24" className="h-5 w-5" fill="none" stroke="currentColor" strokeWidth={2} aria-hidden>

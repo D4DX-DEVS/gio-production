@@ -109,7 +109,7 @@ export function PosterMarquee({ children, label }: { children: React.ReactNode; 
     twin.click();
   };
 
-  const btn = "absolute top-1/2 z-10 flex h-9 w-9 -translate-y-1/2 items-center justify-center rounded-full bg-white/95 text-brand-800 shadow-lg ring-1 ring-line transition hover:bg-brand-600 hover:text-white active:scale-95 sm:h-10 sm:w-10";
+  const btn = "shine absolute top-1/2 z-10 flex h-9 w-9 -translate-y-1/2 items-center justify-center rounded-full bg-white/95 text-brand-800 shadow-lg ring-1 ring-line transition hover:bg-brand-600 hover:text-white active:scale-95 sm:h-10 sm:w-10";
 
   return (
     <div

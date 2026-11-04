@@ -13,7 +13,7 @@ import { hasRole, requireRole } from "@/lib/admin/guard";
 import { fmtDate } from "@/lib/admin/form";
 import { mediaPreviews } from "@/lib/admin/media-options";
 import { ConfirmButton, MediaPicker, SubmitButton } from "@/lib/admin/client";
-import { Badge, Card, Field, PageHeader } from "@/lib/admin/ui";
+import { Badge, Card, Field, PageHeader, SectionTabs } from "@/lib/admin/ui";
 import { addItem, addSection, deleteItem, moveItem, publishPage, saveItem, saveSectionOptions } from "../../pages/actions";
 import { VideoField } from "../video-field";
 
@@ -39,8 +39,8 @@ const KINDS: Record<string, Kind> = {
     fit: "cover",
   },
   posters: {
-    title: "Campaign posters",
-    description: "The “Campaigns & announcements” poster row and the single feature posters on the homepage.",
+    title: "Posters",
+    description: "The “Posters” row on the homepage and any single feature posters.",
     types: ["poster_slider", "image"],
     folder: "banners",
     noun: "poster",
@@ -121,7 +121,10 @@ export default async function HomepageKind({ params }: { params: Promise<{ kind:
       .from(s.sections)
       .where(and(eq(s.sections.pageId, pageId), inArray(s.sections.type, kind.types)))
       .orderBy(asc(s.sections.sort), asc(s.sections.id))
-  ).map((sec) => ({ ...sec, data: JSON.parse(sec.dataJson) as Record<string, unknown>, items: allItems.filter((i) => i.sectionId === sec.id) }));
+  )
+    .map((sec) => ({ ...sec, data: JSON.parse(sec.dataJson) as Record<string, unknown>, items: allItems.filter((i) => i.sectionId === sec.id) }))
+    // The About block's poster has its own screen (About section).
+    .filter((sec) => sec.data.kind !== "about_poster");
   const previews = await mediaPreviews(db, secs.flatMap((x) => x.items.map((i) => i.mediaId)));
   const lastChange = Math.max(0, ...allSecs.map((x) => x.updatedAt.getTime()), ...allItems.map((i) => i.updatedAt.getTime()));
   const unpublished = !current || lastChange > current.publishedAt.getTime();
@@ -158,16 +161,13 @@ export default async function HomepageKind({ params }: { params: Promise<{ kind:
           : "The homepage has never been published. The website shows nothing for it until you publish."}
       </div>
 
-      <nav className="mb-6 flex flex-wrap gap-2 text-sm">
-        {Object.entries(KINDS).map(([k, v]) => (
-          <Link key={k} href={`/admin/homepage/${k}/`} className={`btn ${k === key ? "btn-primary" : "btn-ghost"}`}>
-            {v.title}
-          </Link>
-        ))}
-        <Link href={`/admin/pages/${pageId}/`} className="btn btn-ghost">
-          All homepage sections
-        </Link>
-      </nav>
+      <SectionTabs
+        tabs={[
+          { href: "/admin/homepage/", label: "Overview", active: false },
+          ...Object.entries(KINDS).map(([k, v]) => ({ href: `/admin/homepage/${k}/`, label: v.title.replace(/^Homepage /, ""), active: k === key })),
+          { href: `/admin/pages/${pageId}/`, label: "All sections", active: false },
+        ]}
+      />
 
       {!secs.length ? (
         <Card>

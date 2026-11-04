@@ -11,7 +11,7 @@ export default async function NewLeader({ searchParams }: { searchParams: Promis
   const group = Number(param(await searchParams, "group"));
   return (
     <>
-      <PageHeader
+      <PageHeader icon="leaders" back={{ href: "/admin/leaders/", label: "Leaders" }}
         title="Add a person"
         actions={
           <Link href="/admin/leaders/" className="btn btn-ghost">

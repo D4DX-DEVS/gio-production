@@ -5,9 +5,10 @@ import { schema as s } from "@gio/db";
 import { mediaUrl } from "@/lib/admin/media-options";
 import { getDb } from "@/lib/db";
 import { requireRole, hasRole } from "@/lib/admin/guard";
-import { Badge, Card, EmptyRow, Field, PageHeader, param, Table } from "@/lib/admin/ui";
-import { SubmitButton } from "@/lib/admin/client";
-import { createGroup, saveGroup } from "./actions";
+import { AdminIcon } from "@/lib/admin/icons";
+import { Badge, Card, EmptyRow, Field, PageHeader, RowActions, SectionTabs, param, Table } from "@/lib/admin/ui";
+import { ConfirmButton, SubmitButton } from "@/lib/admin/client";
+import { createGroup, deleteLeader, saveGroup } from "./actions";
 
 export const metadata: Metadata = { title: "Leaders" };
 
@@ -32,11 +33,13 @@ export default async function LeadersPage({ searchParams }: { searchParams: Prom
         .orderBy(asc(s.leaders.sort), asc(s.leaders.id))
     : [];
   const canEdit = hasRole(user, "editor");
+  const canDelete = hasRole(user, "admin");
 
   return (
     <>
       <PageHeader
         title="Leaders"
+        icon="leaders"
         description={
           <>
             Names, roles and links are shown exactly as entered. Entries flagged <Badge value="pending_client" /> are waiting for the client in the review queue.
@@ -44,17 +47,11 @@ export default async function LeadersPage({ searchParams }: { searchParams: Prom
         }
         actions={
           <Link href={scope.page} target="_blank" className="btn btn-ghost">
-            View page ↗
+            View page <AdminIcon name="external" className="h-4 w-4" />
           </Link>
         }
       />
-      <nav className="mb-5 flex flex-wrap gap-2">
-        {SCOPES.map((x) => (
-          <Link key={x.key} href={`/admin/leaders/?scope=${x.key}`} className={`btn ${x.key === scope.key ? "btn-primary" : "btn-ghost"}`}>
-            {x.label}
-          </Link>
-        ))}
-      </nav>
+      <SectionTabs tabs={SCOPES.map((x) => ({ href: `/admin/leaders/?scope=${x.key}`, label: x.label, active: x.key === scope.key }))} />
 
       <div className="space-y-6">
         {groups.map((g) => {
@@ -82,7 +79,7 @@ export default async function LeadersPage({ searchParams }: { searchParams: Prom
                 )}
                 {canEdit ? (
                   <Link href={`/admin/leaders/new/?group=${g.id}`} className="btn btn-primary">
-                    + Add person
+                    <AdminIcon name="plus" className="h-4 w-4" /> Add person
                   </Link>
                 ) : null}
               </div>
@@ -94,7 +91,7 @@ export default async function LeadersPage({ searchParams }: { searchParams: Prom
                     <th>Role</th>
                     <th className="w-16">Order</th>
                     <th>Status</th>
-                    <th className="w-20" />
+                    <th className="w-48" />
                   </tr>
                 </thead>
                 <tbody>
@@ -116,9 +113,16 @@ export default async function LeadersPage({ searchParams }: { searchParams: Prom
                         {l.reviewState !== "verified" ? <Badge value={l.reviewState} /> : null}
                       </td>
                       <td>
-                        <Link href={`/admin/leaders/${l.id}/`} className="text-brand-700 hover:underline">
-                          {canEdit ? "Edit" : "View"}
-                        </Link>
+                        <RowActions editHref={`/admin/leaders/${l.id}/`}>
+                          {canDelete ? (
+                            <form action={deleteLeader}>
+                              <input type="hidden" name="id" value={l.id} />
+                              <ConfirmButton className="btn btn-sm btn-danger" message={`Remove ${l.name} from the website? This cannot be undone.`}>
+                                <AdminIcon name="trash" className="h-3.5 w-3.5" /> Delete
+                              </ConfirmButton>
+                            </form>
+                          ) : null}
+                        </RowActions>
                       </td>
                     </tr>
                   ))}

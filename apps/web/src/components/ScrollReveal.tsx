@@ -2,17 +2,19 @@
 
 import { useEffect } from "react";
 
-/** Elements that fade and rise into place, scale up slightly, or reveal their children one by one. */
-const TARGETS = ".reveal, .reveal-zoom, .reveal-group > *";
+/** Elements that fade and rise into place, slide in from a side, scale up slightly, or reveal their children one by one. */
+const TARGETS = ".reveal, .reveal-zoom, .reveal-left, .reveal-right, .reveal-group > *";
 
 const EASE = "cubic-bezier(0.22, 1, 0.36, 1)";
 const STAGGER = 90; // ms between elements that enter together
 const MAX_STEPS = 6;
 
-const shape = (el: Element): Keyframe[] =>
-  el.classList.contains("reveal-zoom")
-    ? [{ opacity: 0, scale: "0.95", translate: "0 1rem" }, { opacity: 1, scale: "1", translate: "0 0" }]
-    : [{ opacity: 0, translate: "0 1.5rem" }, { opacity: 1, translate: "0 0" }];
+const shape = (el: Element): Keyframe[] => {
+  if (el.classList.contains("reveal-zoom")) return [{ opacity: 0, scale: "0.95", translate: "0 1rem" }, { opacity: 1, scale: "1", translate: "0 0" }];
+  if (el.classList.contains("reveal-left")) return [{ opacity: 0, translate: "-2.5rem 0" }, { opacity: 1, translate: "0 0" }];
+  if (el.classList.contains("reveal-right")) return [{ opacity: 0, translate: "2.5rem 0" }, { opacity: 1, translate: "0 0" }];
+  return [{ opacity: 0, translate: "0 1.5rem" }, { opacity: 1, translate: "0 0" }];
+};
 
 /**
  * Scroll reveals for the public site. Content below the fold is held at its start frame and plays in
@@ -51,6 +53,11 @@ export function ScrollReveal() {
       anim.play();
       // Pictures settle from a slight zoom inside their frame (frames clip with overflow-hidden).
       el.querySelectorAll(".reveal-img").forEach((img) => img.animate([{ scale: "1.06" }, { scale: "1" }], { duration: 1000, delay: step * STAGGER, easing: EASE, fill: "backwards" }));
+      // Small flourishes inside a block: rules that grow from the left, badges that pop, curves that draw themselves.
+      const late = step * STAGGER + 250;
+      el.querySelectorAll(".reveal-line").forEach((line) => line.animate([{ scale: "0 1" }, { scale: "1 1" }], { duration: 700, delay: late, easing: EASE, fill: "backwards" }));
+      el.querySelectorAll(".reveal-pop").forEach((pop) => pop.animate([{ opacity: 0, scale: "0.6" }, { opacity: 1, scale: "1.08", offset: 0.7 }, { opacity: 1, scale: "1" }], { duration: 650, delay: late, easing: EASE, fill: "backwards" }));
+      el.querySelectorAll(".reveal-draw").forEach((path) => path.animate([{ strokeDashoffset: 1 }, { strokeDashoffset: 0 }], { duration: 900, delay: late + 150, easing: EASE, fill: "backwards" }));
     };
 
     const showAll = () => {

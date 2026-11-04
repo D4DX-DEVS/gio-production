@@ -1,11 +1,12 @@
 import type { Metadata, Viewport } from "next";
-import { Inter, Noto_Sans_Malayalam } from "next/font/google";
+import { Anek_Malayalam, Noto_Serif_Malayalam, Poppins } from "next/font/google";
 import "./globals.css";
 
-// One typeface for the whole site: Inter (variable, every weight). Inter has no Malayalam glyphs,
-// so Noto Sans Malayalam only fills in for Malayalam text (see --font-sans in globals.css).
-const inter = Inter({ variable: "--font-inter", subsets: ["latin"], display: "swap" });
-const malayalam = Noto_Sans_Malayalam({ variable: "--font-ml", subsets: ["malayalam"], weight: ["400", "500", "600", "700"], display: "swap" });
+// English is set in Poppins. Poppins has no Malayalam glyphs, so Malayalam falls through to the next font in
+// the stack (--font-sans and --font-display in globals.css): Anek Malayalam in titles, Noto Serif Malayalam in text.
+const poppins = Poppins({ variable: "--font-poppins", subsets: ["latin"], weight: ["300", "400", "500", "600", "700", "800"], display: "swap" });
+const malayalamTitle = Anek_Malayalam({ variable: "--font-ml-title", subsets: ["malayalam"], display: "swap" });
+const malayalamText = Noto_Serif_Malayalam({ variable: "--font-ml-text", subsets: ["malayalam"], display: "swap" });
 
 // Every page reads D1 at request time.
 export const dynamic = "force-dynamic";
@@ -14,20 +15,14 @@ export const metadata: Metadata = {
   metadataBase: new URL("https://www.giokerala.org"),
   title: { default: "GIO Kerala | Girls Islamic Organization", template: "%s | GIO Kerala" },
   description: "Girls Islamic Organization (GIO) Kerala: Islamic students' and young women's organisation in Kerala.",
-  icons: {
-    icon: [
-      { url: "/wp-content/uploads/2025/03/cropped-icon-32x32.png", sizes: "32x32" },
-      { url: "/wp-content/uploads/2025/03/cropped-icon-192x192.png", sizes: "192x192" },
-    ],
-    apple: "/wp-content/uploads/2025/03/cropped-icon-180x180.png",
-  },
+  // Favicons come from the files app/icon.png, app/apple-icon.png and app/favicon.ico.
 };
 
-export const viewport: Viewport = { themeColor: "#185c9a" };
+export const viewport: Viewport = { themeColor: "#0a64a6" };
 
 export default function RootLayout({ children }: LayoutProps<"/">) {
   return (
-    <html lang="en" className={`${inter.variable} ${malayalam.variable} antialiased`}>
+    <html lang="en" className={`${poppins.variable} ${malayalamTitle.variable} ${malayalamText.variable} antialiased`}>
       <body className="min-h-screen flex flex-col">{children}</body>
     </html>
   );

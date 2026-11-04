@@ -57,7 +57,7 @@ export default async function MenusPage() {
   const [menus, items] = await Promise.all([db.select().from(s.menus), db.select().from(s.menuItems).orderBy(asc(s.menuItems.sort), asc(s.menuItems.id))]);
   return (
     <>
-      <PageHeader title="Menus" description="The header menu and the social links shown on every page. Changes appear on the website immediately." />
+      <PageHeader icon="menu" title="Menus" description="The header menu and the social links shown on every page. Changes appear on the website immediately." />
       <div className="space-y-6">
         {menus.map((m) => {
           const mine = items.filter((i) => i.menuId === m.id);

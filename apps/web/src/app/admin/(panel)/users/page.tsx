@@ -10,7 +10,7 @@ export default async function AdminAccessPage() {
 
   return (
     <>
-      <PageHeader title="Admin access" description="The admin login is set in the server environment, not in this dashboard." />
+      <PageHeader icon="access" title="Admin access" description="The admin login is set in the server environment, not in this dashboard." />
       <Card title="Current login">
         <dl className="grid gap-3 text-sm sm:grid-cols-[10rem_1fr]">
           <dt className="text-muted">Username</dt>

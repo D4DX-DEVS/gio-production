@@ -73,7 +73,7 @@ export default async function MediaPage({ searchParams }: { searchParams: Promis
 
   return (
     <>
-      <PageHeader title="Media library" description="Every image and PDF from the old site keeps its original web address. New uploads are stored in R2." />
+      <PageHeader icon="image" title="Media library" description="Every image and PDF from the old site keeps its original web address. New uploads are stored in R2." />
       {hasRole(user, "editor") ? (
         <Card title="Upload" className="mb-6">
           <form action="/admin/media-upload/" method="post" encType="multipart/form-data" className="grid gap-3 sm:grid-cols-[2fr_1fr_2fr_auto] sm:items-end">

@@ -28,7 +28,7 @@ export function HeroCarousel({ slides, intervalMs = 5000 }: { slides: Slide[]; i
   return (
     <section aria-roledescription="carousel" aria-label="Highlights" className="relative overflow-hidden bg-brand-900" onMouseEnter={() => setPaused(true)} onMouseLeave={() => setPaused(false)}>
       {/* The banner spans the full width at its own aspect ratio, so the whole image shows edge to edge. */}
-      <div className="hero-enter relative w-full overflow-hidden" style={{ aspectRatio: `${w} / ${h}` }}>
+      <div className="hero-enter lit relative w-full overflow-hidden" style={{ aspectRatio: `${w} / ${h}` }}>
         {slides.map((s, i) => {
           const active = i === index;
           // Portrait and square posters would lose most of their text under object-cover, so they sit whole on a brand backdrop.
@@ -71,12 +71,12 @@ export function HeroCarousel({ slides, intervalMs = 5000 }: { slides: Slide[]; i
       </div>
       {slides.length > 1 && (
         <div className="hero-controls">
-          <button type="button" onClick={() => setIndex((index - 1 + slides.length) % slides.length)} aria-label="Previous slide" className="absolute left-3 top-1/2 hidden -translate-y-1/2 rounded-full bg-white/80 p-1.5 text-brand-900 shadow backdrop-blur transition duration-200 hover:scale-110 hover:bg-white active:scale-95 sm:block lg:left-5">
+          <button type="button" onClick={() => setIndex((index - 1 + slides.length) % slides.length)} aria-label="Previous slide" className="shine absolute left-3 top-1/2 hidden -translate-y-1/2 rounded-full bg-white/80 p-1.5 text-brand-900 shadow backdrop-blur transition duration-200 hover:scale-110 hover:bg-white active:scale-95 sm:block lg:left-5">
             <svg viewBox="0 0 24 24" className="h-4 w-4 sm:h-5 sm:w-5" fill="none" stroke="currentColor" strokeWidth="2.5" aria-hidden>
               <path d="m15 6-6 6 6 6" />
             </svg>
           </button>
-          <button type="button" onClick={() => setIndex((index + 1) % slides.length)} aria-label="Next slide" className="absolute right-3 top-1/2 hidden -translate-y-1/2 rounded-full bg-white/80 p-1.5 text-brand-900 shadow backdrop-blur transition duration-200 hover:scale-110 hover:bg-white active:scale-95 sm:block lg:right-5">
+          <button type="button" onClick={() => setIndex((index + 1) % slides.length)} aria-label="Next slide" className="shine absolute right-3 top-1/2 hidden -translate-y-1/2 rounded-full bg-white/80 p-1.5 text-brand-900 shadow backdrop-blur transition duration-200 hover:scale-110 hover:bg-white active:scale-95 sm:block lg:right-5">
             <svg viewBox="0 0 24 24" className="h-4 w-4 sm:h-5 sm:w-5" fill="none" stroke="currentColor" strokeWidth="2.5" aria-hidden>
               <path d="m9 6 6 6-6 6" />
             </svg>

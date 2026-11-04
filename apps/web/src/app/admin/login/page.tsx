@@ -4,7 +4,7 @@ import { redirect } from "next/navigation";
 import { Img } from "@/components/Img";
 import { adminCredentials, getAdminUser, MIN_ADMIN_PASSWORD_LENGTH } from "@/lib/auth";
 import { getSiteInfo } from "@/lib/content";
-import { SubmitButton } from "@/lib/admin/client";
+import { PasswordInput, SubmitButton } from "@/lib/admin/client";
 
 export const metadata: Metadata = { title: "Sign in · GIO Admin", robots: { index: false, follow: false } };
 
@@ -14,7 +14,7 @@ export default async function LoginPage({ searchParams }: PageProps<"/admin/logi
   const creds = adminCredentials();
   const configured = creds !== null;
   return (
-    <main className="relative isolate flex flex-1 items-center justify-center overflow-hidden bg-gradient-to-br from-brand-900 via-brand-800 to-brand-600 px-4 py-12 sm:py-16">
+    <main className="admin-theme relative isolate flex flex-1 items-center justify-center overflow-hidden bg-gradient-to-br from-brand-900 via-brand-800 to-brand-600 px-4 py-12 sm:py-16">
       {/* Soft background shapes; purely decorative. */}
       <div aria-hidden className="pointer-events-none absolute -left-32 -top-32 -z-10 h-96 w-96 rounded-full bg-brand-400/30 blur-3xl" />
       <div aria-hidden className="pointer-events-none absolute -bottom-40 -right-24 -z-10 h-[28rem] w-[28rem] rounded-full bg-accent-500/20 blur-3xl" />
@@ -39,7 +39,7 @@ export default async function LoginPage({ searchParams }: PageProps<"/admin/logi
               production, ADMIN_TOTP_SECRET in the server environment.
             </p>
           ) : error ? (
-            <p role="alert" className="mt-5 rounded-lg bg-red-50 px-3 py-2 text-sm text-accent-700 ring-1 ring-red-200">
+            <p role="alert" className="mt-5 rounded-lg bg-red-50 px-3 py-2 text-sm text-danger-700 ring-1 ring-red-200">
               {creds.totpSecret ? "Wrong username, password or code." : "Wrong username or password."}
             </p>
           ) : null}
@@ -49,10 +49,11 @@ export default async function LoginPage({ searchParams }: PageProps<"/admin/logi
               <span className="label">Username</span>
               <input name="username" type="text" required autoComplete="username" autoCapitalize="none" spellCheck={false} className="field" />
             </label>
-            <label className="block">
-              <span className="label">Password</span>
-              <input name="password" type="password" required autoComplete="current-password" className="field" />
-            </label>
+            {/* A div + htmlFor (not a wrapping label) so the toggle button's name stays out of the field's label. */}
+            <div>
+              <label htmlFor="password" className="label">Password</label>
+              <PasswordInput id="password" name="password" required autoComplete="current-password" />
+            </div>
             {creds?.totpSecret ? (
               <label className="block">
                 <span className="label">Authenticator code</span>

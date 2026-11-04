@@ -22,7 +22,7 @@ export default async function EditLeader({ params }: { params: Promise<{ id: str
     .where(and(eq(s.reviewItems.entityType, "leader"), eq(s.reviewItems.entityId, String(id))));
   return (
     <>
-      <PageHeader
+      <PageHeader icon="leaders" back={{ href: "/admin/leaders/", label: "Leaders" }}
         title={leader.name}
         description={`Imported from ${leader.legacySourceUrl}`}
         actions={

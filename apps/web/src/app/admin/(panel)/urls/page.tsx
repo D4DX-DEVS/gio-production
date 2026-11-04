@@ -42,7 +42,7 @@ export default async function UrlsPage({ searchParams }: { searchParams: Promise
 
   return (
     <>
-      <PageHeader
+      <PageHeader icon="link"
         title="Old website URLs"
         description={`${n("same_path")} old addresses keep working at the same path. ${n("pending_decision")} (mostly theme-demo pages) wait for the client: send each to a page (301) or mark it gone (410). Nothing is redirected until it is decided here.`}
       />

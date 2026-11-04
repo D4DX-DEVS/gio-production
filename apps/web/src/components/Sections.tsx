@@ -6,10 +6,14 @@ import { langOf } from "@/lib/text";
 import { ChannelVideos } from "./ChannelVideos";
 import { ContactSection } from "./ContactSection";
 import { HeroCarousel } from "./HeroCarousel";
+import { ArrowRight } from "./Icons";
 import { Img } from "./Img";
+import { InstagramFeed } from "./InstagramFeed";
 import { LightboxScope } from "./LightboxScope";
 import { PosterMarquee } from "./PosterMarquee";
+import { SectionFrame } from "./SectionFrame";
 import { Container, SectionHeading } from "./ui";
+import { readShowTitle } from "@/lib/section-style";
 
 export function layoutMedia(m: LayoutMedia | null, alt?: string | null): PublicMedia | null {
   if (!m) return null;
@@ -39,7 +43,7 @@ function RichText({ html, className = "" }: { html: string; className?: string }
 
 /** Headings for homepage blocks that had none on the old site (labels only, no new content). */
 const DEFAULT_TITLES: Partial<Record<LayoutSection["type"], string>> = {
-  poster_slider: "Campaigns & announcements",
+  poster_slider: "Posters",
   featured_video: "Watch",
   logo_carousel: "Our initiatives",
 };
@@ -58,43 +62,131 @@ export function Sections({ layout, inserts = {}, pageTitle }: Props) {
   const form = secs.find((s) => s.type === "contact_form");
   const contactDetails = form && secs.find((s) => s.type === "rich_text" && s.data.kind === "contact_details");
   const contactMap = form && secs.find((s) => s.type === "map");
+  // The homepage "About" block is two sections drawn together: the text, and the poster on its right.
+  const aboutText = secs.find((s) => s.type === "rich_text" && s.data.kind === "about");
+  const aboutPoster = secs.find((s) => s.type === "image" && s.data.kind === "about_poster");
   for (let i = 0; i < secs.length; i++) {
     const s = secs[i];
     const next = secs[i + 1];
+    if (s === aboutText || s === aboutPoster) {
+      // The poster is drawn with the text; on its own (text deleted) it is drawn alone.
+      if (s === aboutText || !aboutText)
+        out.push(
+          <SectionFrame key={s.id} data={s.data}>
+            <AboutSection text={aboutText ?? null} poster={aboutPoster ?? null} />
+          </SectionFrame>,
+        );
+      if (inserts[i]) out.push(<div key={`ins-${i}`}>{inserts[i]}</div>);
+      continue;
+    }
     if (s === contactDetails || s === contactMap) {
       if (inserts[i]) out.push(<div key={`ins-${i}`}>{inserts[i]}</div>);
       continue;
     }
     if (s === form) {
-      out.push(<ContactSection key={s.id} form={s} details={contactDetails} map={contactMap} />);
+      out.push(
+        <SectionFrame key={s.id} data={s.data}>
+          <ContactSection form={s} details={contactDetails} map={contactMap} />
+        </SectionFrame>,
+      );
       if (inserts[i]) out.push(<div key={`ins-${i}`}>{inserts[i]}</div>);
       continue;
     }
     // An image directly followed by text is shown side by side, as on the old About page.
-    if (s.type === "image" && next?.type === "rich_text" && s.items[0]?.media) {
-      out.push(<ImageWithText key={s.id} image={s} text={next} />);
+    if (s.type === "image" && next?.type === "rich_text" && next !== aboutText && s.items[0]?.media) {
+      out.push(
+        <SectionFrame key={s.id} data={s.data}>
+          <ImageWithText image={s} text={next} />
+        </SectionFrame>,
+      );
       if (inserts[i]) out.push(<div key={`ins-${i}`}>{inserts[i]}</div>);
       i++;
       if (inserts[i]) out.push(<div key={`ins-${i}`}>{inserts[i]}</div>);
       continue;
     }
-    out.push(<Section key={s.id} section={s} pageTitle={pageTitle} />);
+    out.push(
+      <SectionFrame key={s.id} data={s.data}>
+        <Section section={s} pageTitle={pageTitle} />
+      </SectionFrame>,
+    );
     if (inserts[i]) out.push(<div key={`ins-${i}`}>{inserts[i]}</div>);
   }
   return <>{out}</>;
 }
 
+/** Homepage "About" block: heading, text and a button on the left, a poster card on the right, on soft lavender waves. */
+function AboutSection({ text, poster }: { text: LayoutSection | null; poster: LayoutSection | null }) {
+  const item = poster?.items.find((i) => i.media) ?? null;
+  const media = item ? layoutMedia(item.media, item.altText) : null;
+  const heading = String(text?.data.heading ?? text?.title ?? "");
+  const html = String(text?.data.html ?? "");
+  const buttonLabel = String(text?.data.buttonLabel ?? "");
+  const buttonUrl = String(text?.data.buttonUrl ?? "");
+  const external = /^https?:/.test(buttonUrl);
+  if (!heading && !html && !media) return null;
+  return (
+    <section className="relative isolate overflow-hidden bg-white py-12 sm:py-16 lg:py-20">
+      <svg aria-hidden className="pointer-events-none absolute inset-0 -z-10 h-full w-full" viewBox="0 0 1440 640" preserveAspectRatio="none">
+        <path className="wave-drift" d="M980 -20C1060 120 1240 150 1500 60V-20Z" fill="#eaf5fd" />
+        <path className="wave-drift" d="M-60 470C230 400 430 600 760 560S1190 440 1500 520V660H-60Z" fill="#e3f1fc" />
+        <path className="wave-drift-b" d="M-60 540C260 480 470 640 800 610S1200 520 1500 590V660H-60Z" fill="#d6eafa" opacity="0.7" />
+      </svg>
+      <LightboxScope>
+        <Container className={`grid items-center gap-10 lg:gap-14 ${media && (heading || html) ? "lg:grid-cols-[1.2fr_0.8fr]" : ""}`}>
+          {heading || html ? (
+            <div className="reveal-group">
+              <div className="mb-5">
+                <span aria-hidden className="reveal-line block h-1 w-24 origin-left rounded-full bg-brand-600" />
+              </div>
+              {heading ? (
+                <h2 lang={langOf(heading)} className="text-3xl font-extrabold leading-[1.15] tracking-tight text-brand-600 sm:text-4xl lg:text-[3.25rem] [&:lang(ml)]:text-2xl [&:lang(ml)]:font-bold [&:lang(ml)]:leading-snug [&:lang(ml)]:tracking-normal sm:[&:lang(ml)]:text-3xl lg:[&:lang(ml)]:text-[2.5rem]">
+                  {heading}
+                </h2>
+              ) : null}
+              {html ? <RichText html={html} className="mt-6 text-[1.0625rem] leading-8 text-slate-800 sm:text-lg [&_p]:mb-5" /> : null}
+              {buttonLabel && buttonUrl ? (
+                <a
+                  href={buttonUrl}
+                  className="btn-fx shine group mt-3 inline-flex items-center gap-3 rounded-full bg-brand-600 px-7 py-3.5 text-base font-semibold text-white shadow-lg shadow-brand-700/30 transition hover:bg-brand-700"
+                  {...(external ? { target: "_blank", rel: "noopener noreferrer" } : {})}
+                >
+                  {buttonLabel}
+                  <ArrowRight className="h-5 w-5 transition-transform duration-200 group-hover:translate-x-1" />
+                </a>
+              ) : null}
+            </div>
+          ) : null}
+          {media && item ? (
+            <div className="reveal-right mx-auto w-full max-w-md lg:max-w-none">
+              <Linked item={item} className="lit block rounded-[1.75rem] bg-white p-1.5 shadow-2xl shadow-brand-700/25 ring-1 ring-brand-100 transition duration-500 ease-(--ease-soft) hover:-translate-y-1.5 hover:rotate-1 hover:shadow-brand-700/35 lg:ml-auto lg:max-w-md">
+                <Img media={media} className="reveal-img h-auto w-full rounded-[1.4rem]" />
+              </Linked>
+            </div>
+          ) : null}
+        </Container>
+      </LightboxScope>
+    </section>
+  );
+}
+
+/** An image followed by text (the About Us page): the picture is a wide banner across the top, the text sits in a card under it. */
 function ImageWithText({ image, text }: { image: LayoutSection; text: LayoutSection }) {
   const item = image.items[0];
   return (
-    <section className="py-9 sm:py-12">
+    <section className="bg-paper py-8 sm:py-12 lg:py-14">
       {/* Unlinked photos (here and in the text) open full size in the lightbox. */}
       <LightboxScope>
-        <Container className="grid grid-cols-1 items-start gap-6 md:grid-cols-[minmax(0,4fr)_minmax(0,8fr)] lg:gap-10">
-          <Linked item={item} className="reveal group mx-auto block w-full max-w-sm overflow-hidden rounded-2xl shadow-lg shadow-brand-900/10 ring-1 ring-line md:sticky md:top-[calc(var(--header-h)+1.5rem)] md:max-w-none">
+        <Container className="max-w-6xl space-y-6 sm:space-y-8">
+          <Linked item={item} className="lit reveal group block overflow-hidden rounded-3xl bg-white shadow-lift ring-1 ring-line">
             <Img media={layoutMedia(item.media, item.altText)} className="zoom-media reveal-img h-auto w-full" />
           </Linked>
-          <RichText html={String(text.data.html ?? "")} className="reveal-group" />
+          <article className="reveal relative overflow-hidden rounded-3xl bg-white px-5 pb-8 pt-9 shadow-lift ring-1 ring-line sm:px-10 sm:pb-12 sm:pt-12 lg:px-14">
+            <span aria-hidden className="absolute inset-x-0 top-0 h-1.5 bg-gradient-to-r from-brand-600 via-brand-400 to-accent-500" />
+            <RichText
+              html={String(text.data.html ?? "")}
+              className="mx-auto max-w-4xl [&>h2:first-child]:border-b [&>h2:first-child]:border-line [&>h2:first-child]:pb-4 [&>h2:first-child]:text-[1.375rem] sm:[&>h2:first-child]:text-[1.75rem]"
+            />
+          </article>
         </Container>
       </LightboxScope>
     </section>
@@ -118,7 +210,7 @@ function PosterSpotlight({ item }: { item: LayoutItem }) {
         <span aria-hidden className={`${bracket} -right-3 -top-3 rounded-tr-xl border-r-[3px] border-t-[3px]`} />
         <span aria-hidden className={`${bracket} -bottom-3 -left-3 rounded-bl-xl border-b-[3px] border-l-[3px]`} />
         <span aria-hidden className={`${bracket} -bottom-3 -right-3 rounded-br-xl border-b-[3px] border-r-[3px]`} />
-        <Linked item={item} className="relative block overflow-hidden rounded-lg bg-white shadow-xl shadow-brand-900/30 ring-[3px] ring-white">
+        <Linked item={item} className="lit relative block overflow-hidden rounded-lg bg-white shadow-xl shadow-brand-900/30 ring-[3px] ring-white">
           <Img media={media} className="reveal-img h-auto w-full transition duration-700 group-hover/poster:scale-[1.03]" />
         </Linked>
       </div>
@@ -127,7 +219,8 @@ function PosterSpotlight({ item }: { item: LayoutItem }) {
 }
 
 function Section({ section: s, pageTitle }: { section: LayoutSection; pageTitle?: string }) {
-  const title = s.title ?? DEFAULT_TITLES[s.type];
+  // The admin can switch a heading off (data.showTitle === false) on blocks that show one.
+  const title = readShowTitle(s.data) ? (s.title ?? DEFAULT_TITLES[s.type]) : undefined;
   switch (s.type) {
     case "hero_carousel": {
       const slides = s.items
@@ -141,7 +234,7 @@ function Section({ section: s, pageTitle }: { section: LayoutSection; pageTitle?
         <section className="py-6 sm:py-9">
           <Container>
             {s.items.map((i) => (
-              <Linked key={i.id} item={i} className="reveal group block overflow-hidden rounded-2xl shadow-md shadow-brand-900/10 ring-1 ring-line transition hover:shadow-xl">
+              <Linked key={i.id} item={i} className="lit reveal group block overflow-hidden rounded-2xl shadow-md shadow-brand-900/10 ring-1 ring-line transition hover:shadow-xl">
                 <Img media={layoutMedia(i.media, i.altText)} className="reveal-img h-auto w-full transition duration-500 group-hover:scale-[1.01]" />
               </Linked>
             ))}
@@ -182,7 +275,7 @@ function Section({ section: s, pageTitle }: { section: LayoutSection; pageTitle?
                   // Spacing is padding, not gap, so each copy of the row is exactly one loop wide.
                   <div key={i.id} className="shrink-0 pr-3.5 sm:pr-4 lg:pr-5">
                     {/* Hover grows the whole card (not the image inside its frame); PosterMarquee leaves room for it. */}
-                    <Linked item={i} className="relative block w-48 cursor-pointer overflow-hidden rounded-xl bg-white shadow-sm ring-1 ring-line transition duration-300 ease-(--ease-soft) hover:z-10 hover:scale-[1.06] hover:shadow-lift motion-reduce:hover:scale-100 sm:w-56 lg:w-64 2xl:w-72 [&_img]:cursor-pointer!">
+                    <Linked item={i} className="lit relative block w-48 cursor-pointer overflow-hidden rounded-xl bg-white shadow-sm ring-1 ring-line transition duration-300 ease-(--ease-soft) hover:z-10 hover:scale-[1.06] hover:shadow-lift motion-reduce:hover:scale-100 sm:w-56 lg:w-64 2xl:w-72 [&_img]:cursor-pointer!">
                       <Img media={layoutMedia(i.media, i.altText)} className="skeleton aspect-[4/5] h-auto w-full object-cover" />
                     </Linked>
                   </div>
@@ -197,16 +290,34 @@ function Section({ section: s, pageTitle }: { section: LayoutSection; pageTitle?
     case "logo_carousel": {
       const logos = s.items.map((i) => ({ i, m: layoutMedia(i.media, i.altText) })).filter((x) => x.m);
       if (!logos.length) return null;
+      // One loop is a row of at least 24 logos, wider than any screen. The track holds two loops and
+      // slides exactly one, and spacing is padding (not gap), so the end meets the start with no break.
+      const loop = Array.from({ length: Math.ceil(24 / logos.length) }, () => logos).flat();
       return (
         <section className="py-9 sm:py-12">
-          <Container>
-            <p className="reveal mb-5 text-center text-xs font-semibold uppercase tracking-[0.2em] text-muted sm:mb-6 sm:text-sm">{title}</p>
-          </Container>
-          <div className="reveal group relative overflow-hidden [mask-image:linear-gradient(to_right,transparent,black_10%,black_90%,transparent)]">
-            <div className="flex w-max animate-[marquee_40s_linear_infinite] gap-10 lg:gap-14 group-hover:[animation-play-state:paused]">
-              {[...logos, ...logos].map(({ i, m }, k) => (
-                <div key={`${i.id}-${k}`} className="flex h-14 w-28 shrink-0 items-center justify-center lg:h-16 lg:w-36" aria-hidden={k >= logos.length}>
-                  <img src={m!.url} alt={k < logos.length ? m!.alt : ""} className="max-h-14 w-auto max-w-full object-contain lg:max-h-16 opacity-80 grayscale transition duration-300 hover:scale-110 hover:opacity-100 hover:grayscale-0" loading="lazy" />
+          {title ? (
+            <Container>
+              <p className="reveal mb-5 flex items-center justify-center gap-3 text-xs font-semibold uppercase tracking-[0.2em] text-muted sm:mb-7 sm:text-sm">
+                <span aria-hidden className="reveal-line h-0.5 w-8 origin-right rounded-full bg-accent-600" />
+                {title}
+                <span aria-hidden className="reveal-line h-0.5 w-8 origin-left rounded-full bg-accent-600" />
+              </p>
+            </Container>
+          ) : null}
+          <div className="reveal group relative overflow-hidden [mask-image:linear-gradient(to_right,transparent,black_8%,black_92%,transparent)]">
+            <div className="flex w-max animate-[marquee_60s_linear_infinite] group-hover:[animation-play-state:paused]" style={{ animationDuration: `${Math.round(loop.length * 2.6)}s` }}>
+              {[0, 1].map((n) => (
+                <div key={n} className="flex shrink-0" aria-hidden={n === 1 || undefined}>
+                  {loop.map(({ i, m }, k) => (
+                    <div key={`${i.id}-${k}`} className="lit flex h-16 w-32 shrink-0 items-center justify-center rounded-xl px-4 lg:h-20 lg:w-44 lg:px-6" aria-hidden={k >= logos.length || undefined}>
+                      <img
+                        src={m!.url}
+                        alt={n === 0 && k < logos.length ? m!.alt : ""}
+                        className="max-h-14 w-auto max-w-full object-contain transition duration-300 ease-(--ease-soft) hover:scale-110 hover:opacity-80 hover:grayscale lg:max-h-16"
+                        loading="lazy"
+                      />
+                    </div>
+                  ))}
                 </div>
               ))}
             </div>
@@ -215,9 +326,7 @@ function Section({ section: s, pageTitle }: { section: LayoutSection; pageTitle?
       );
     }
     case "instagram_feed":
-      // Removed at the user's request (2026-10-29): the "follow us" banner only repeated the header/footer link.
-      // The section type stays so a real feed can be rendered here if the client settles decision C11.
-      return null;
+      return <InstagramFeed section={s} />;
     case "embed": {
       const src = String(s.data.src ?? "");
       if (!/^https:\/\//.test(src)) return null;

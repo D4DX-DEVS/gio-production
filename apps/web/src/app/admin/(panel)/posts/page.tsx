@@ -4,16 +4,20 @@ import { POST_STATUSES } from "@gio/db/schema";
 import { schema } from "@gio/db";
 import { getDb } from "@/lib/db";
 import { encodePath } from "@/lib/content";
-import { requireRole } from "@/lib/admin/guard";
+import { hasRole, requireRole } from "@/lib/admin/guard";
 import { contains } from "@/lib/admin/sql";
 import { fmtDate } from "@/lib/admin/form";
-import { Badge, EmptyRow, PageHeader, Pagination, Table, pageParam, param } from "@/lib/admin/ui";
+import { AdminIcon } from "@/lib/admin/icons";
+import { ConfirmButton } from "@/lib/admin/client";
+import { Badge, EmptyState, PageHeader, Pagination, RowActions, SectionTabs, Table, pageParam, param } from "@/lib/admin/ui";
+import { deletePost } from "./actions";
 
-export const metadata = { title: "Posts" };
+export const metadata = { title: "News" };
 const PAGE_SIZE = 25;
 
 export default async function PostsPage({ searchParams }: PageProps<"/admin/posts">) {
-  await requireRole("contributor");
+  const { user } = await requireRole("contributor");
+  const canDelete = hasRole(user, "admin");
   const sp = await searchParams;
   const page = pageParam(sp);
   const q = param(sp, "q")?.trim();
@@ -25,7 +29,7 @@ export default async function PostsPage({ searchParams }: PageProps<"/admin/post
     q ? or(contains(p.title, q), contains(p.slug, q)) : undefined,
   );
   const db = getDb();
-  const [rows, [{ n }]] = await Promise.all([
+  const [rows, [{ n }], statusCounts] = await Promise.all([
     db
       .select({
         id: p.id,
@@ -43,44 +47,67 @@ export default async function PostsPage({ searchParams }: PageProps<"/admin/post
       .limit(PAGE_SIZE)
       .offset((page - 1) * PAGE_SIZE),
     db.select({ n: count() }).from(p).where(where),
+    db.select({ status: p.status, n: count() }).from(p).where(isNull(p.deletedAt)).groupBy(p.status),
   ]);
+  const byStatus = new Map(statusCounts.map((c) => [c.status, c.n]));
+  const total = statusCounts.reduce((a, c) => a + c.n, 0);
+  const tabHref = (st?: string) => {
+    const qs = new URLSearchParams();
+    if (st) qs.set("status", st);
+    if (q) qs.set("q", q);
+    const t = qs.toString();
+    return t ? `/admin/posts/?${t}` : "/admin/posts/";
+  };
 
   return (
     <>
       <PageHeader
-        title="Posts"
-        description="News, reports and articles. Published posts appear on the website at their own URL."
+        title="News"
+        icon="news"
+        description="News, reports and articles shown on the website's News page. Published posts appear at their own address."
         actions={
-          <Link href="/admin/posts/new/" className="btn btn-primary">
-            + New post
-          </Link>
+          <>
+            <a href="/gio-news/" target="_blank" className="btn btn-ghost">
+              View page <AdminIcon name="external" className="h-4 w-4" />
+            </a>
+            <Link href="/admin/posts/new/" className="btn btn-primary">
+              <AdminIcon name="plus" className="h-4 w-4" /> Add news
+            </Link>
+          </>
         }
       />
+      <SectionTabs
+        tabs={[
+          { href: tabHref(), label: "All", active: !status, count: total },
+          ...POST_STATUSES.filter((st) => byStatus.has(st)).map((st) => ({ href: tabHref(st), label: st[0].toUpperCase() + st.slice(1), active: status === st, count: byStatus.get(st) })),
+        ]}
+      />
       <form className="mb-4 flex flex-wrap gap-2" action="/admin/posts/">
-        <input name="q" defaultValue={q} placeholder="Search title or slug" className="field max-w-xs" />
-        <select name="status" defaultValue={status ?? ""} className="field w-auto">
-          <option value="">All statuses</option>
-          {POST_STATUSES.map((s) => (
-            <option key={s} value={s}>
-              {s}
-            </option>
-          ))}
-        </select>
-        <button className="btn btn-ghost">Filter</button>
+        {status ? <input type="hidden" name="status" value={status} /> : null}
+        <div className="relative w-full max-w-sm">
+          <AdminIcon name="search" className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
+          <input name="q" defaultValue={q} placeholder="Search title or address" className="field pl-9" />
+        </div>
+        <button className="btn btn-ghost">Search</button>
+        {q ? (
+          <Link href={tabHref(status)} className="btn btn-quiet">
+            Clear
+          </Link>
+        ) : null}
       </form>
-      <Table>
-        <thead>
-          <tr>
-            <th>Title</th>
-            <th>Category</th>
-            <th>Status</th>
-            <th>Date</th>
-            <th></th>
-          </tr>
-        </thead>
-        <tbody>
-          {rows.length ? (
-            rows.map((r) => (
+      {rows.length ? (
+        <Table>
+          <thead>
+            <tr>
+              <th>Title</th>
+              <th>Category</th>
+              <th>Status</th>
+              <th>Date</th>
+              <th></th>
+            </tr>
+          </thead>
+          <tbody>
+            {rows.map((r) => (
               <tr key={r.id}>
                 <td className="max-w-md">
                   <Link href={`/admin/posts/${r.id}/`} className="font-medium text-ink hover:text-brand-700 hover:underline">
@@ -96,20 +123,34 @@ export default async function PostsPage({ searchParams }: PageProps<"/admin/post
                   </div>
                 </td>
                 <td className="whitespace-nowrap text-muted">{fmtDate(r.publishedAt ?? r.updatedAt)}</td>
-                <td className="whitespace-nowrap text-right">
-                  {r.status === "published" ? (
-                    <a href={`/${encodePath(r.slug)}/`} target="_blank" className="text-sm text-brand-700 hover:underline">
-                      View ↗
-                    </a>
-                  ) : null}
+                <td>
+                  <RowActions editHref={`/admin/posts/${r.id}/`} viewHref={r.status === "published" ? `/${encodePath(r.slug)}/` : undefined}>
+                    {canDelete ? (
+                      <form action={deletePost.bind(null, r.id)}>
+                        <ConfirmButton className="btn btn-sm btn-danger" message={`Delete “${r.title || "this post"}”? It is removed from the website and moved to the trash.`}>
+                          <AdminIcon name="trash" className="h-3.5 w-3.5" /> Delete
+                        </ConfirmButton>
+                      </form>
+                    ) : null}
+                  </RowActions>
                 </td>
               </tr>
-            ))
-          ) : (
-            <EmptyRow colSpan={5}>No posts match.</EmptyRow>
-          )}
-        </tbody>
-      </Table>
+            ))}
+          </tbody>
+        </Table>
+      ) : (
+        <EmptyState
+          icon="news"
+          title={q || status ? "No news matches" : "No news yet"}
+          action={
+            <Link href="/admin/posts/new/" className="btn btn-primary">
+              <AdminIcon name="plus" className="h-4 w-4" /> Add news
+            </Link>
+          }
+        >
+          {q || status ? "Try a different search or status." : "Write your first news post and it appears on the website once published."}
+        </EmptyState>
+      )}
       <Pagination basePath="/admin/posts/" page={page} pageSize={PAGE_SIZE} total={n} params={{ q, status }} />
     </>
   );

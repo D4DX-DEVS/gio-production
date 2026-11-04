@@ -1,20 +1,25 @@
 @import "tailwindcss";
 
-/* GIO Kerala identity: primary blue and accent red come from the old site's Elementor kit (post-9.css). */
+/* GIO Kerala identity: every colour comes from the logo's blues (bright #0898e8 down to deep #0868a8).
+   brand = the logo's mid to deep blues (text, buttons, dark surfaces); accent = its bright blue (eyebrows,
+   highlights, call-to-action buttons); danger = red, kept only for errors and delete actions. */
 @theme {
-  --color-brand-50: #eef5fb;
-  --color-brand-100: #d6e6f4;
-  --color-brand-200: #adcbe8;
-  --color-brand-300: #7eaad6;
-  --color-brand-400: #4a85bf;
-  --color-brand-500: #2669a7;
-  --color-brand-600: #185c9a;
-  --color-brand-700: #134a7c;
-  --color-brand-800: #0f3a61;
-  --color-brand-900: #0b2944;
-  --color-accent-500: #e0272a;
-  --color-accent-600: #c80406;
-  --color-accent-700: #a00305;
+  --color-brand-50: #eaf5fd;
+  --color-brand-100: #cfe8fa;
+  --color-brand-200: #9ccdf3;
+  --color-brand-300: #5eaee8;
+  --color-brand-400: #1f93e0;
+  --color-brand-500: #0b7cc9;
+  --color-brand-600: #0a64a6;
+  --color-brand-700: #0a5290;
+  --color-brand-800: #0a3f72;
+  --color-brand-900: #0a2c52;
+  --color-accent-500: #0898e8;
+  --color-accent-600: #0679c4;
+  --color-accent-700: #05619e;
+  --color-danger-500: #e0272a;
+  --color-danger-600: #c80406;
+  --color-danger-700: #a00305;
   --color-ink: #1b2430;
   --color-muted: #5b6573;
   --color-line: #e3e8ef;
@@ -31,7 +36,9 @@
 /* One font family everywhere: Inter, with Noto Sans Malayalam picked per glyph for Malayalam,
    then system fallbacks if the web fonts fail to load. Headings differ by weight and size only. */
 @theme inline {
-  --font-sans: var(--font-inter), var(--font-ml), ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+  /* Text: Poppins for English, Noto Serif Malayalam for Malayalam. Titles: Poppins, Anek Malayalam for Malayalam. */
+  --font-sans: var(--font-poppins), var(--font-ml-text), ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+  --font-display: var(--font-poppins), var(--font-ml-title), ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
 }
 
 @keyframes fade-up {
@@ -63,11 +70,19 @@ html:has(dialog[open]) { overflow: hidden; }
    Media-query breakpoints are unaffected (they use the browser's initial font size). */
 @media (min-width: 64rem) { html:has(main[data-site]) { font-size: 87.5%; } }
 
-/* Height of the sticky site header (Header.tsx: 3.5rem bar, 4rem from lg, + 1px border, plus the 1.5rem top bar from md).
+/* Height of the sticky site header (Header.tsx: 4rem bar, 4.5rem from md, 5.5rem from lg, + 1px border, plus the 2rem top bar from lg).
    In rem so it follows the scale above. Sticky sub-navs and the mobile menu sit right under it. */
-:root { --header-h: calc(3.5rem + 1px); }
-@media (min-width: 48rem) { :root { --header-h: calc(5rem + 1px); } }
-@media (min-width: 64rem) { :root { --header-h: calc(5.5rem + 1px); } }
+:root { --header-h: calc(4rem + 1px); }
+@media (min-width: 48rem) { :root { --header-h: calc(4.5rem + 1px); } }
+@media (min-width: 64rem) { :root { --header-h: calc(7.5rem + 1px); } }
+
+/* Titles (and the labels on buttons) use the display stack; everything else inherits the text stack from body. */
+@layer base {
+  h1, h2, h3, h4, h5, h6, button, summary { font-family: var(--font-display); }
+  /* Malayalam is set in Noto Serif, which wants taller lines than Latin text (a leading-* utility still wins). */
+  :where(p, li, blockquote, td):lang(ml) { line-height: 1.9; }
+  :where(h1, h2, h3, h4, h5, h6):lang(ml) { line-height: 1.5; }
+}
 
 body {
   background: #fff;
@@ -115,18 +130,68 @@ body {
 .prose-gio td, .prose-gio th { border: 1px solid var(--color-line); padding: 0.5rem 0.65rem; }
 
 /* Admin form controls */
-.field { display: block; width: 100%; border: 1px solid #cfd8e3; border-radius: 0.5rem; padding: 0.5rem 0.75rem; background: #fff; font-size: 0.95rem; }
-.field:focus { outline: 2px solid var(--color-brand-400); outline-offset: 1px; border-color: var(--color-brand-400); }
+.field { display: block; width: 100%; border: 1px solid #cfd8e3; border-radius: 0.6rem; padding: 0.55rem 0.8rem; background: #fff; font-size: 0.95rem; transition: border-color 0.15s, box-shadow 0.15s; }
+.field:hover { border-color: #b4c2d3; }
+.field:focus { outline: none; border-color: var(--color-brand-500); box-shadow: 0 0 0 3px rgb(11 124 201 / 0.2); }
+.field-with-action { padding-right: 2.75rem; }
 .label { display: block; font-size: 0.8rem; font-weight: 600; color: #3b4655; margin-bottom: 0.3rem; }
-.btn { display: inline-flex; align-items: center; justify-content: center; gap: 0.4rem; border-radius: 0.5rem; padding: 0.5rem 1rem; font-size: 0.9rem; font-weight: 600; transition: background-color 0.2s, border-color 0.2s, color 0.2s, box-shadow 0.2s, transform 0.2s var(--ease-soft); cursor: pointer; }
+.btn { display: inline-flex; align-items: center; justify-content: center; gap: 0.4rem; border-radius: 0.6rem; padding: 0.5rem 1rem; font-size: 0.9rem; font-weight: 600; transition: background-color 0.2s, border-color 0.2s, color 0.2s, box-shadow 0.2s, transform 0.2s var(--ease-soft); cursor: pointer; }
+.btn:focus-visible { outline: none; box-shadow: 0 0 0 3px rgb(11 124 201 / 0.3); }
 .btn:active:not(:disabled) { transform: scale(0.97); }
 .btn:disabled { opacity: 0.6; cursor: not-allowed; }
-.btn-primary { background: var(--color-brand-600); color: #fff; }
+.btn-primary { background: var(--color-brand-600); color: #fff; box-shadow: 0 1px 2px rgb(11 41 68 / 0.18); }
 .btn-primary:hover { background: var(--color-brand-700); }
 .btn-ghost { background: #fff; border: 1px solid #cfd8e3; color: #26303d; }
-.btn-ghost:hover { background: var(--color-paper); }
-.btn-danger { background: #fff; border: 1px solid #f1b4b5; color: var(--color-accent-700); }
+.btn-ghost:hover { background: var(--color-paper); border-color: #b4c2d3; }
+.btn-danger { background: #fff; border: 1px solid #f1b4b5; color: var(--color-danger-700); }
 .btn-danger:hover { background: #fdecec; }
+.btn-quiet { background: transparent; color: var(--color-muted); }
+.btn-quiet:hover { background: var(--color-paper); color: var(--color-brand-700); }
+.btn-sm { padding: 0.3rem 0.65rem; font-size: 0.8rem; border-radius: 0.5rem; }
+
+/* GIO Studio admin theme: blue (brand) and red (accent). It only remaps the colour tokens inside the admin
+   frame (shell.tsx, login), so every admin page picks it up from the same utility classes while the public
+   website keeps the logo colours above. brand-900 is the deep navy used for headings and dark surfaces. */
+.admin-theme {
+  --color-brand-50: #eef3ff;
+  --color-brand-100: #dce7fb;
+  --color-brand-200: #bccff7;
+  --color-brand-300: #93b0f0;
+  --color-brand-400: #5f88e8;
+  --color-brand-500: #3b68e0;
+  --color-brand-600: #1d4ed8;
+  --color-brand-700: #1a42b8;
+  --color-brand-800: #16358f;
+  --color-brand-900: #0f1a33;
+  --color-accent-500: #e5384d;
+  --color-accent-600: #d7263d;
+  --color-accent-700: #a3122a;
+  --color-danger-500: #c81e3a;
+  --color-danger-600: #a3122a;
+  --color-danger-700: #8a0f24;
+  --color-ink: #0f1a33;
+  --color-muted: #4f5b78;
+  --color-line: #d6dcec;
+  --color-paper: #f1f4fa;
+  --shadow-card: 0 1px 2px rgb(15 26 51 / 0.05), 0 1px 3px rgb(15 26 51 / 0.06);
+  --shadow-lift: 0 14px 30px -12px rgb(15 26 51 / 0.24), 0 4px 10px -4px rgb(15 26 51 / 0.08);
+  --shadow-pop: 0 24px 60px -16px rgb(15 26 51 / 0.35);
+}
+.admin-theme .field { border-color: #c3ccdf; }
+.admin-theme .field:hover { border-color: #a5b1cb; }
+.admin-theme .field:focus { border-color: var(--color-brand-500); box-shadow: 0 0 0 3px rgb(29 78 216 / 0.2); }
+.admin-theme .btn:focus-visible { box-shadow: 0 0 0 3px rgb(29 78 216 / 0.3); }
+.admin-theme .btn-primary { box-shadow: 0 1px 2px rgb(15 26 51 / 0.2); }
+.admin-theme .btn-ghost { border-color: #c3ccdf; color: var(--color-ink); }
+.admin-theme .btn-ghost:hover { border-color: #a5b1cb; }
+.admin-theme .btn-danger { border-color: #f0b3bd; }
+.admin-theme .btn-danger:hover { background: #fdeaed; }
+.admin-theme .label { color: #2c3752; }
+/* Phones: the studio's tap targets are at least 44px. */
+@media (max-width: 40rem) {
+  .admin-theme .btn { min-height: 2.75rem; }
+  .admin-theme .field { min-height: 2.75rem; }
+}
 
 /* Lightbox photo (Lightbox.tsx): swings up out of the page in 3D as it opens. */
 @keyframes photo-pop-3d {
@@ -244,8 +309,8 @@ body {
 .splash {
   position: fixed; inset: 0; z-index: 100; display: grid; place-items: center; padding: 1rem;
   background:
-    radial-gradient(60% 50% at 15% 10%, rgb(38 105 167 / 0.12), transparent 70%),
-    radial-gradient(50% 45% at 90% 95%, rgb(200 4 6 / 0.07), transparent 70%),
+    radial-gradient(60% 50% at 15% 10%, rgb(11 124 201 / 0.14), transparent 70%),
+    radial-gradient(50% 45% at 90% 95%, rgb(8 152 232 / 0.1), transparent 70%),
     var(--color-paper);
   transition: opacity 0.6s var(--ease-soft), visibility 0s linear 0.6s;
   /* Fail-safe: fades out on its own if the script that removes it never runs. */
@@ -261,7 +326,7 @@ body {
   animation: splash-pop 0.9s var(--ease-soft) both;
 }
 .splash-halo {
-  position: absolute; inset: -10px; border-radius: 1.9rem; border: 1.5px solid rgb(38 105 167 / 0.28);
+  position: absolute; inset: -10px; border-radius: 1.9rem; border: 1.5px solid rgb(11 124 201 / 0.3);
   animation: splash-halo 1.8s ease-out 0.5s infinite both;
 }
 .splash-title { animation: fade-up 0.7s ease-out 0.3s both; }
@@ -361,6 +426,83 @@ body {
 }
 @keyframes skeleton-pulse {
   50% { opacity: 0.55; }
+}
+
+/* Homepage micro-motion: waves, avatar ring, pulse and button shine. Decoration only; reduced motion turns each of them off. */
+@keyframes wave-drift {
+  from { translate: -40px 0; }
+  to { translate: 40px 0; }
+}
+@keyframes ring-spin { to { rotate: 360deg; } }
+@keyframes arrow-bob {
+  0%, 100% { translate: 0 1px; }
+  50% { translate: 0 -3px; }
+}
+@keyframes ping-ring {
+  from { scale: 1; opacity: 0.6; }
+  to { scale: 1.8; opacity: 0; }
+}
+@keyframes soft-pulse {
+  0%, 100% { scale: 1; }
+  50% { scale: 1.12; }
+}
+@media (prefers-reduced-motion: no-preference) {
+  .wave-drift { animation: wave-drift 11s ease-in-out infinite alternate; }
+  .wave-drift-b { animation: wave-drift 15s ease-in-out infinite alternate-reverse; }
+  .ig-ring::before { animation: ring-spin 7s linear infinite; }
+  .soft-pulse { animation: soft-pulse 2.8s ease-in-out infinite; }
+  .arrow-bob { animation: arrow-bob 1.8s ease-in-out infinite; }
+  .ping-ring { animation: ping-ring 1.6s ease-out infinite; }
+}
+/* Instagram avatar: a gradient ring that slowly turns around the picture. */
+.ig-ring { position: relative; isolation: isolate; border-radius: 9999px; }
+.ig-ring::before {
+  content: ""; position: absolute; inset: 0; z-index: -1; border-radius: inherit;
+  background: conic-gradient(#f58529, #dd2a7b, #8134af, #515bd4, #f58529);
+}
+/* Hover lighting (components/LightFx.tsx feeds --mx/--my with the pointer position).
+   .lit    image frames: a soft light follows the pointer over the picture and a bright streak sweeps across it.
+   .shine  buttons (and .btn-fx pills, public .btn): the same light, drawn behind the label.
+   The frame clips the light, so it needs overflow hidden; both live in the components layer so a utility
+   such as absolute or sticky on the same element still wins. Touch screens and reduced motion get none of the movement. */
+@layer components {
+  :is(.lit, .shine, .btn-fx, main[data-site] .btn) { position: relative; overflow: hidden; isolation: isolate; }
+  :is(.lit, .shine, .btn-fx, main[data-site] .btn)::before,
+  :is(.lit, .shine, .btn-fx, main[data-site] .btn)::after { content: ""; position: absolute; pointer-events: none; opacity: 0; }
+  :is(.lit, .shine, .btn-fx, main[data-site] .btn)::before {
+    inset: 0; transition: opacity 0.35s var(--ease-soft);
+    background: radial-gradient(circle at var(--mx, 50%) var(--my, 50%), rgb(255 255 255 / 0.4), rgb(255 255 255 / 0.12) 30%, transparent 58%);
+  }
+  :is(.lit, .shine, .btn-fx, main[data-site] .btn)::after {
+    top: -20%; bottom: -20%; left: 0; width: 38%; translate: -160% 0; transform: skewX(-18deg);
+    background: linear-gradient(90deg, transparent, rgb(255 255 255 / 0.55), transparent);
+  }
+  /* Images: the light sits above the picture. Buttons: between their background and their label. */
+  :is(.lit)::before, :is(.lit)::after { z-index: 1; }
+  :is(.shine, .btn-fx, main[data-site] .btn):not(.lit)::before, :is(.shine, .btn-fx, main[data-site] .btn):not(.lit)::after { z-index: -1; }
+}
+@media (hover: hover) {
+  :is(.lit, .shine, .btn-fx, main[data-site] .btn):hover::before { opacity: 1; }
+  :is(.lit, .shine, .btn-fx, main[data-site] .btn):hover::after { opacity: 1; translate: 380% 0; transition: translate 0.9s var(--ease-soft); }
+  .lit:hover img { filter: brightness(1.06) saturate(1.1); }
+}
+.lit img { transition: filter 0.4s var(--ease-soft), transform 0.6s var(--ease-soft); }
+@media (prefers-reduced-motion: reduce) {
+  :is(.lit, .shine, .btn-fx, main[data-site] .btn)::after { display: none; }
+}
+
+/* Menu drop-down (components/MobileMenu.tsx): the panel slides down from the header, its items follow one by one. */
+@keyframes menu-drop {
+  from { opacity: 0; translate: 0 -0.75rem; scale: 0.98; }
+  to { opacity: 1; translate: 0 0; scale: 1; }
+}
+@keyframes menu-item {
+  from { opacity: 0; translate: -0.5rem 0; }
+  to { opacity: 1; translate: 0 0; }
+}
+@media (prefers-reduced-motion: no-preference) {
+  .menu-drop { animation: menu-drop 0.3s var(--ease-soft) both; transform-origin: top; }
+  .menu-item { animation: menu-item 0.4s var(--ease-soft) both; }
 }
 
 @media print {
