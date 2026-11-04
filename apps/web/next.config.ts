@@ -6,6 +6,14 @@ const nextConfig: NextConfig = {
   trailingSlash: true,
   // Workspace packages ship TypeScript source
   transpilePackages: ["@gio/db"],
+  experimental: {
+    serverActions: {
+      // giokerala.org reaches the Worker under its workers.dev address, so a Server Action arrives with
+      // Origin: giokerala.org but X-Forwarded-Host: <worker>.workers.dev. Next treats that as a forged request
+      // and answers 500 (every admin Save said "Could not save"). Naming the public hosts makes the check accept them.
+      allowedOrigins: ["giokerala.org", "www.giokerala.org"],
+    },
+  },
   turbopack: {
     rules: {
       "*.css": {
