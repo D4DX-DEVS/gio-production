@@ -7,6 +7,6 @@ BETTER_AUTH_URL=http://localhost:3000
 ADMIN_USERNAME=
 ADMIN_PASSWORD=
 ADMIN_NAME=
-# Two-factor (authenticator app). Optional under `pnpm dev`, REQUIRED by production builds
-# (including `pnpm preview`). Generate with: node scripts/generate-totp-secret.mjs
+# Two-factor (authenticator app). Optional, leave empty for username and password only.
+# Generate one with: node scripts/generate-totp-secret.mjs
 ADMIN_TOTP_SECRET=

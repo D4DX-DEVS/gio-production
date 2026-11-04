@@ -43,7 +43,7 @@ Secrets are never committed.
 | `BETTER_AUTH_URL` | the site's public URL, for example `https://www.giokerala.org` |
 | `ADMIN_USERNAME`, `ADMIN_PASSWORD` | the only admin login (password at least 12 characters) |
 | `ADMIN_NAME` | name shown in the admin sidebar (optional) |
-| `ADMIN_TOTP_SECRET` | two-factor secret from `node apps/web/scripts/generate-totp-secret.mjs`. **Required in production**: without it nobody can sign in |
+| `ADMIN_TOTP_SECRET` | optional, leave unset: the admin signs in with the username and password only. Setting it (from `node apps/web/scripts/generate-totp-secret.mjs`) turns on the authenticator-code step |
 
 All variable names, including ones for later (Turnstile, email, Cloudflare Access), are listed in [.env.example](.env.example).
 

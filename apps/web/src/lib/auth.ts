@@ -9,9 +9,9 @@
 // cookie, so changing ADMIN_USERNAME, ADMIN_PASSWORD or ADMIN_TOTP_SECRET signs every session
 // out at once.
 //
-// Two-factor: with ADMIN_TOTP_SECRET set, sign-in also needs the 6-digit authenticator code;
-// a production build refuses to sign anyone in without it. Failed attempts are throttled in D1
-// (src/lib/admin/login-throttle.ts).
+// Two-factor is optional and off by default: sign-in is the username and password alone. Only
+// when ADMIN_TOTP_SECRET is set does sign-in also need the 6-digit authenticator code.
+// Failed attempts are throttled in D1 (src/lib/admin/login-throttle.ts).
 import { betterAuth } from "better-auth";
 import { drizzleAdapter } from "better-auth/adapters/drizzle";
 import { hashPassword } from "better-auth/crypto";
@@ -80,18 +80,15 @@ interface AdminCredentials {
   username: string;
   password: string;
   name: string;
-  /** Base32 TOTP secret, or null when two-factor is off (development only). */
+  /** Base32 TOTP secret, or null when two-factor is off (the default). */
   totpSecret: string | null;
 }
 
 const normalizeUsername = (s: string) => s.trim().toLowerCase();
 
-/** Production builds require two-factor; `next dev` allows signing in without it. */
-const twoFactorRequired = () => process.env.NODE_ENV === "production";
-
 /**
  * The env credentials, or null when sign-in is not safely configured: missing values, a short
- * password, an invalid TOTP secret, or (production) no TOTP secret. Fails closed.
+ * password, or a TOTP secret that is set but invalid. Fails closed.
  */
 export function adminCredentials(): AdminCredentials | null {
   const env = getEnv();
@@ -99,7 +96,7 @@ export function adminCredentials(): AdminCredentials | null {
   const password = env.ADMIN_PASSWORD ?? "";
   const totpSecret = env.ADMIN_TOTP_SECRET?.replace(/\s/g, "").toUpperCase() || null;
   if (!username || password.length < MIN_ADMIN_PASSWORD_LENGTH || !env.BETTER_AUTH_SECRET) return null;
-  if (totpSecret ? !isValidSecret(totpSecret) : twoFactorRequired()) return null;
+  if (totpSecret && !isValidSecret(totpSecret)) return null;
   return { username, password, name: env.ADMIN_NAME?.trim() || "Administrator", totpSecret };
 }
 

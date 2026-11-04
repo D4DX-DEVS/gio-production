@@ -20,14 +20,13 @@ export default async function AdminAccessPage() {
           <dt className="text-muted">Role</dt>
           <dd className="font-medium">{user.role}</dd>
           <dt className="text-muted">Two-factor</dt>
-          <dd className="font-medium">{adminCredentials()?.totpSecret ? "On (authenticator app)" : "Off: development only, production refuses to sign in"}</dd>
+          <dd className="font-medium">{adminCredentials()?.totpSecret ? "On (authenticator app)" : "Off (username and password only)"}</dd>
         </dl>
       </Card>
       <Card title="Change the username or password" className="mt-6">
         <div className="space-y-3 text-sm">
           <p>
-            Edit <code>ADMIN_USERNAME</code>, <code>ADMIN_PASSWORD</code>, <code>ADMIN_TOTP_SECRET</code> (two-factor; required in production,
-            make a new one with <code>node scripts/generate-totp-secret.mjs</code>) and optionally <code>ADMIN_NAME</code>:
+            Edit <code>ADMIN_USERNAME</code>, <code>ADMIN_PASSWORD</code> and optionally <code>ADMIN_NAME</code>:
           </p>
           <ul className="list-disc space-y-1 pl-5">
             <li>
@@ -38,8 +37,7 @@ export default async function AdminAccessPage() {
             </li>
           </ul>
           <p className="text-muted">
-            Changing the username, password or two-factor secret signs out every open admin session straight away. A lost authenticator
-            is recovered the same way: set a new <code>ADMIN_TOTP_SECRET</code>.
+            Changing the username or password signs out every open admin session straight away.
           </p>
         </div>
       </Card>

@@ -35,8 +35,7 @@ export default async function LoginPage({ searchParams }: PageProps<"/admin/logi
           <p className="mt-1 text-sm text-muted">Sign in to manage the website.</p>
           {!configured ? (
             <p role="alert" className="mt-5 rounded-lg bg-amber-50 px-3 py-2 text-sm text-amber-800 ring-1 ring-amber-200">
-              Admin sign-in is not configured. Set ADMIN_USERNAME, ADMIN_PASSWORD (at least {MIN_ADMIN_PASSWORD_LENGTH} characters) and, for
-              production, ADMIN_TOTP_SECRET in the server environment.
+              Admin sign-in is not configured. Set ADMIN_USERNAME, ADMIN_PASSWORD (at least {MIN_ADMIN_PASSWORD_LENGTH} characters) in the server environment.
             </p>
           ) : error ? (
             <p role="alert" className="mt-5 rounded-lg bg-red-50 px-3 py-2 text-sm text-danger-700 ring-1 ring-red-200">
