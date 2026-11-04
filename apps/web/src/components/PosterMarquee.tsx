@@ -11,6 +11,14 @@ const unfocusable = (el: HTMLElement | null) => {
 };
 
 /**
+ * The same position moved into the middle copy, [w, 2w), by whole loop widths (w = one copy's width).
+ * A row with no width (hidden while the page is swapped out on navigation, or not laid out yet) has no
+ * copies to hop between, so the position stays as it is. Subtracting a zero width in a loop never ends
+ * and froze the whole tab ("Page Unresponsive") when a menu link was clicked.
+ */
+const intoMiddle = (x: number, w: number) => (w > 0 && Number.isFinite(x) ? w + ((((x - w) % w) + w) % w) : x);
+
+/**
  * Highlights row that drifts left on its own and loops seamlessly. The items are rendered three
  * times and the view is kept on the middle copy, so the arrows and swipes can always move either way.
  * Keeps moving on hover; pauses for keyboard focus and briefly after a swipe or arrow click.
@@ -29,12 +37,7 @@ export function PosterMarquee({ children, label }: { children: React.ReactNode; 
     const setW = () => (el.firstElementChild as HTMLElement).offsetWidth;
     const fitsNow = () => setW() <= el.clientWidth + 1;
     // Same picture, shifted into the middle copy.
-    const centre = (x: number) => {
-      const w = setW();
-      while (x >= 2 * w) x -= w;
-      while (x < w) x += w;
-      return x;
-    };
+    const centre = (x: number) => intoMiddle(x, setW());
 
     const measure = () => setFits(fitsNow());
     measure();
@@ -85,10 +88,7 @@ export function PosterMarquee({ children, label }: { children: React.ReactNode; 
     if (!el) return;
     const w = (el.firstElementChild as HTMLElement).offsetWidth;
     // Re-centre instantly (looks identical), then glide one page.
-    let x = el.scrollLeft;
-    while (x >= 2 * w) x -= w;
-    while (x < w) x += w;
-    el.scrollLeft = x;
+    el.scrollLeft = intoMiddle(el.scrollLeft, w);
     st.current.until = performance.now() + IDLE_AFTER_TOUCH;
     const smooth = !window.matchMedia("(prefers-reduced-motion: reduce)").matches;
     el.scrollBy({ left: d * el.clientWidth * 0.8, behavior: smooth ? "smooth" : "auto" });

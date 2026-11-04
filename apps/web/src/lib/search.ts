@@ -5,7 +5,7 @@ import { and, eq, inArray, isNull } from "drizzle-orm";
 import { schema } from "@gio/db";
 import type { PageLayout } from "@gio/db/layout";
 import { getDb } from "./db";
-import { getLeaderGroups, listPosts } from "./content";
+import { getLeaderGroups, listPosts, livePosts } from "./content";
 import { stripHtml } from "./text";
 
 const LEGACY_CHILLU: [RegExp, string][] = [
@@ -48,7 +48,7 @@ export async function search(query: string) {
 
   const [{ items: cards }, postRows, pageRows, eventRows, state, district, former] = await Promise.all([
     listPosts({}, 1, 1000),
-    db.select({ id: schema.posts.id, title: schema.posts.title, body: schema.posts.bodyHtml, excerpt: schema.posts.excerpt }).from(schema.posts).where(and(eq(schema.posts.status, "published"), isNull(schema.posts.deletedAt))),
+    db.select({ id: schema.posts.id, title: schema.posts.title, body: schema.posts.bodyHtml, excerpt: schema.posts.excerpt }).from(schema.posts).where(livePosts()),
     db
       .select({ slug: schema.pages.slug, title: schema.pages.title, layout: schema.publishedLayouts.layoutJson })
       .from(schema.pages)

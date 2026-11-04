@@ -1,12 +1,12 @@
 "use client";
-// Home page builder: the sections in order, a live draft preview, and a Customize panel for the selected one.
-// Every change is saved to the draft straight away (see ./actions.ts); the website changes on Publish.
+// Home page builder: the sections in order, a preview, and a Customize panel for the selected one.
+// Every change is saved straight away and is on the website at once (see ./actions.ts).
 import Link from "next/link";
 import { useEffect, useRef, useState, type ReactNode } from "react";
 import { AdminIcon } from "@/lib/admin/icons";
 import { NEWS_KEY, type BuilderBlock, type BuilderResult, type BuilderState } from "@/lib/admin/homepage-blocks";
 import { BG_COLORS, DEVICE_OPTIONS, SPACE_OPTIONS, type SectionBg, type SectionDevice, type SectionSpace } from "@/lib/section-style";
-import { addHomeSection, moveSection, publishHomepage, reorderSections, saveSectionStyle, setBlockVisible } from "./actions";
+import { addHomeSection, moveSection, reorderSections, saveSectionStyle, setBlockVisible } from "./actions";
 
 type Status = { kind: "idle" | "saving" | "saved" | "error"; text: string };
 
@@ -75,7 +75,7 @@ function Preview({ homeId, view, nonce }: { homeId: number; view: "desktop" | "p
       <div className="mx-auto" style={{ width: w * scale, height: h * scale }}>
         <iframe
           key={nonce}
-          title={`Draft of the home page, ${view} size`}
+          title={`Home page preview, ${view} size`}
           src={`/admin/preview/page/${homeId}/`}
           className="block border-0 bg-white"
           style={{ width: w, height: h, transform: `scale(${scale})`, transformOrigin: "top left" }}
@@ -87,12 +87,12 @@ function Preview({ homeId, view, nonce }: { homeId: number; view: "desktop" | "p
 
 export function HomeBuilder({ initial, canEdit }: { initial: BuilderState; canEdit: boolean }) {
   const [blocks, setBlocks] = useState<BuilderBlock[]>(initial.blocks);
-  const [unpublished, setUnpublished] = useState(initial.unpublished);
-  const [publishedAt, setPublishedAt] = useState(initial.publishedAt);
   const [sel, setSel] = useState<string | null>(initial.blocks[0]?.key ?? null);
   const [status, setStatus] = useState<Status>({ kind: "idle", text: "" });
   const [view, setView] = useState<"desktop" | "phone">("desktop");
   const [nonce, setNonce] = useState(0);
+  // The preview renders the whole website page on the server, so it loads only once the editor asks for it.
+  const [showPreview, setShowPreview] = useState(false);
   const [adding, setAdding] = useState(false);
   const [drag, setDrag] = useState<{ from: string | null; over: string | null }>({ from: null, over: null });
   const queue = useRef<Promise<unknown>>(Promise.resolve());
@@ -101,6 +101,7 @@ export function HomeBuilder({ initial, canEdit }: { initial: BuilderState; canEd
   const homeId = initial.homeId;
   const refreshPreview = () => {
     if (previewTimer.current) clearTimeout(previewTimer.current);
+    if (!showPreview) return;
     previewTimer.current = setTimeout(() => setNonce((n) => n + 1), 1500);
   };
   useEffect(() => () => { if (previewTimer.current) clearTimeout(previewTimer.current); }, []);
@@ -128,8 +129,6 @@ export function HomeBuilder({ initial, canEdit }: { initial: BuilderState; canEd
       // While more changes are waiting to save, keep what the editor sees; a failure always shows the real state.
       if (r?.state && (settled || !r.ok)) {
         setBlocks(r.state.blocks);
-        setUnpublished(r.state.unpublished);
-        setPublishedAt(r.state.publishedAt);
       }
       if (!r) setStatus({ kind: "error", text: "Could not save. Check your connection and try again." });
       else if (!r.ok) setStatus({ kind: "error", text: r.message });
@@ -168,26 +167,14 @@ export function HomeBuilder({ initial, canEdit }: { initial: BuilderState; canEd
 
   return (
     <div className="space-y-5">
-      <section aria-label="Publish state" className={`flex flex-wrap items-center justify-between gap-3 rounded-2xl px-5 py-4 ring-1 ${unpublished ? "bg-red-50 text-red-950 ring-red-200" : "bg-brand-50 text-brand-900 ring-brand-100"}`}>
-        <div className="min-w-0 flex-1 basis-72">
-          <p className="font-semibold">{unpublished ? "You have changes that are not on the website yet." : "The website shows this draft."}</p>
-          <p className="text-sm opacity-80">
-            {publishedAt ? `Last published ${new Intl.DateTimeFormat("en-IN", { timeZone: "Asia/Kolkata", day: "numeric", month: "short", year: "numeric", hour: "2-digit", minute: "2-digit" }).format(new Date(publishedAt))}.` : "The homepage has never been published."}{" "}
-            <span aria-live="polite" className={`font-medium ${statusTone}`}>
-              {status.text}
-            </span>
-          </p>
-        </div>
-        {canEdit ? (
-          <button
-            type="button"
-            disabled={!unpublished || status.kind === "saving"}
-            onClick={() => commit(null, () => publishHomepage(homeId))}
-            className="btn btn-primary min-h-11 px-5"
-          >
-            Publish homepage
-          </button>
-        ) : null}
+      <section aria-label="Save state" className="flex flex-wrap items-center gap-3 rounded-2xl bg-emerald-50 px-5 py-3.5 text-emerald-950 ring-1 ring-emerald-200">
+        <span aria-hidden className={`h-2.5 w-2.5 shrink-0 rounded-full ${status.kind === "error" ? "bg-danger-600" : status.kind === "saving" ? "bg-amber-500" : "bg-emerald-600"}`} />
+        <p className="min-w-0 flex-1 basis-72 text-sm">
+          <span className="font-semibold">Every change here is saved and on the website straight away.</span>{" "}
+          <span aria-live="polite" className={`font-medium ${statusTone}`}>
+            {status.text}
+          </span>
+        </p>
       </section>
 
       <div className="grid gap-5 xl:grid-cols-[21rem_minmax(0,1fr)]">
@@ -481,27 +468,40 @@ export function HomeBuilder({ initial, canEdit }: { initial: BuilderState; canEd
             <div className="mb-3 flex flex-wrap items-center justify-between gap-3">
               <div>
                 <h2 id="hb-preview" className="text-lg font-semibold text-brand-900">
-                  Live preview of the draft
+                  Preview of the home page
                 </h2>
                 <p className="text-sm text-muted">Refreshes a moment after you stop making changes. Latest news is filled in on the live site.</p>
               </div>
               <div className="flex items-center gap-2">
-                <div role="group" aria-label="Preview size" className="flex gap-1 rounded-full bg-white p-1 ring-1 ring-line">
-                  {(["desktop", "phone"] as const).map((v) => (
-                    <button key={v} type="button" aria-pressed={view === v} onClick={() => setView(v)} className={`min-h-10 rounded-full px-4 text-sm font-semibold ${view === v ? "bg-brand-900 text-white" : "text-brand-900 hover:bg-paper"}`}>
-                      {v === "desktop" ? "Desktop" : "Phone"}
+                {showPreview ? (
+                  <>
+                    <div role="group" aria-label="Preview size" className="flex gap-1 rounded-full bg-white p-1 ring-1 ring-line">
+                      {(["desktop", "phone"] as const).map((v) => (
+                        <button key={v} type="button" aria-pressed={view === v} onClick={() => setView(v)} className={`min-h-10 rounded-full px-4 text-sm font-semibold ${view === v ? "bg-brand-900 text-white" : "text-brand-900 hover:bg-paper"}`}>
+                          {v === "desktop" ? "Desktop" : "Phone"}
+                        </button>
+                      ))}
+                    </div>
+                    <button type="button" onClick={() => setNonce((n) => n + 1)} className="btn btn-ghost min-h-11">
+                      Refresh
                     </button>
-                  ))}
-                </div>
-                <button type="button" onClick={() => setNonce((n) => n + 1)} className="btn btn-ghost min-h-11">
-                  Refresh
-                </button>
-                <Link href={`/admin/preview/page/${homeId}/`} target="_blank" className="btn btn-ghost min-h-11">
-                  Open <AdminIcon name="external" className="h-4 w-4" />
+                  </>
+                ) : null}
+                <Link href="/" target="_blank" className="btn btn-ghost min-h-11">
+                  Open the website <AdminIcon name="external" className="h-4 w-4" />
                 </Link>
               </div>
             </div>
-            <Preview homeId={homeId} view={view} nonce={nonce} />
+            {showPreview ? (
+              <Preview homeId={homeId} view={view} nonce={nonce} />
+            ) : (
+              <div className="rounded-2xl border border-dashed border-slate-300 bg-white px-6 py-10 text-center">
+                <p className="mx-auto max-w-md text-sm text-muted">The preview loads the whole page, so it waits until you want it. Your changes are already live either way.</p>
+                <button type="button" onClick={() => setShowPreview(true)} className="btn btn-primary mt-4 min-h-11">
+                  Show the preview
+                </button>
+              </div>
+            )}
           </section>
         </div>
       </div>

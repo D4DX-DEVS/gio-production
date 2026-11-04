@@ -1,6 +1,6 @@
-// Server side of the home page builder: turns the homepage's draft `sections` rows into builder blocks.
+// Server side of the home page builder: turns the homepage's `sections` rows into builder blocks.
 // Used by the page (first render) and by every builder action (the fresh state it returns).
-import { and, asc, eq, inArray } from "drizzle-orm";
+import { asc, eq, inArray } from "drizzle-orm";
 import { schema as s, type Db } from "@gio/db";
 import { parseData } from "@/lib/admin/homepage";
 import { readIntro, readShowTitle, readStyle } from "@/lib/section-style";
@@ -92,15 +92,10 @@ export async function loadBuilderState(db: Db, homeId: number): Promise<BuilderS
   const rows = await db.select().from(s.sections).where(eq(s.sections.pageId, homeId)).orderBy(asc(s.sections.sort), asc(s.sections.id));
   const items = rows.length
     ? await db
-        .select({ sectionId: s.sectionItems.sectionId, isVisible: s.sectionItems.isVisible, updatedAt: s.sectionItems.updatedAt })
+        .select({ sectionId: s.sectionItems.sectionId, isVisible: s.sectionItems.isVisible })
         .from(s.sectionItems)
         .where(inArray(s.sectionItems.sectionId, rows.map((r) => r.id)))
     : [];
-  const [current] = await db
-    .select({ publishedAt: s.publishedLayouts.publishedAt })
-    .from(s.publishedLayouts)
-    .where(and(eq(s.publishedLayouts.pageId, homeId), eq(s.publishedLayouts.isCurrent, true)))
-    .limit(1);
 
   const shown = (id: number) => items.filter((i) => i.sectionId === id && i.isVisible).length;
   const groups = groupSections(rows);
@@ -114,7 +109,7 @@ export async function loadBuilderState(db: Db, homeId: number): Promise<BuilderS
       kind === "slides" ? `${n} slide${n === 1 ? "" : "s"}`
       : kind === "wide_banner" ? `${n} banner${n === 1 ? "" : "s"}`
       : kind === "about" ? (g.rows.length > 1 ? "Text and poster" : "Text")
-      : kind === "instagram" ? `${Number(data.count) || 6} posts`
+      : kind === "instagram" ? `${Number(data.count) || 8} posts`
       : kind === "posters" ? `${n} poster${n === 1 ? "" : "s"}`
       : kind === "videos" ? `${Number(data.maxCards) || 6} cards`
       : kind === "logos" ? `${n} logo${n === 1 ? "" : "s"}`
@@ -180,7 +175,6 @@ export async function loadBuilderState(db: Db, homeId: number): Promise<BuilderS
   const pinned = blocks.filter((b) => b.pinnedLast);
   const ordered = [...blocks.filter((b) => !b.pinnedLast), ...pinned];
 
-  const lastChange = Math.max(0, ...rows.map((x) => x.updatedAt.getTime()), ...items.map((i) => i.updatedAt.getTime()));
-  return { homeId, blocks: ordered, unpublished: !current || lastChange > current.publishedAt.getTime(), publishedAt: current ? current.publishedAt.getTime() : null };
+  return { homeId, blocks: ordered };
 }
 

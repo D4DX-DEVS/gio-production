@@ -3,7 +3,7 @@ import { useState } from "react";
 import { EMBED_ALLOW, EMBED_REFERRER, youtubeId } from "@/lib/youtube";
 
 /** YouTube link input with a live thumbnail and an inline player to check the video before saving. */
-export function VideoField({ defaultValue = "", required = true }: { defaultValue?: string; required?: boolean }) {
+export function VideoField({ defaultValue = "", required = true, name = "linkUrl" }: { defaultValue?: string; required?: boolean; name?: string }) {
   const [value, setValue] = useState(defaultValue);
   const [playing, setPlaying] = useState(false);
   const id = youtubeId(value);
@@ -12,7 +12,7 @@ export function VideoField({ defaultValue = "", required = true }: { defaultValu
       <label className="block">
         <span className="label">YouTube link</span>
         <input
-          name="linkUrl"
+          name={name}
           className="field"
           required={required}
           placeholder="https://www.youtube.com/watch?v=… or https://youtu.be/…"

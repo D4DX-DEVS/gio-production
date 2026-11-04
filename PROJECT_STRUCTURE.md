@@ -38,6 +38,10 @@ gio-production/
 └── PROJECT_STRUCTURE.md         this file
 ```
 
+## How the admin saves
+
+The admin menu is a vertical sidebar (`apps/web/src/app/admin/(panel)/layout.tsx` builds it, `shell.tsx` draws it). Every website section is its own card with its own Save button (`apps/web/src/lib/admin/section-form.tsx`). A save writes the draft rows and then calls `goLive` (`apps/web/src/lib/admin/live.ts`), which snapshots them into `published_layouts`, the only thing the public site reads. There is no separate Publish step; old snapshots are trimmed to the latest 20 per page.
+
 ## Where to find things
 
 | Looking for | Location |

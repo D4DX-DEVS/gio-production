@@ -3,6 +3,7 @@
 import { and, count, eq, inArray, isNull } from "drizzle-orm";
 import { schema as s, type Db } from "@gio/db";
 import { currentPageLayout } from "@gio/db/layout";
+import { livePosts } from "@/lib/content";
 import { youtubeId } from "@/lib/youtube";
 
 export interface HomepageCounts {
@@ -42,7 +43,7 @@ export async function galleryCount(db: Db): Promise<number> {
       .select({ n: count() })
       .from(s.posts)
       .innerJoin(s.media, eq(s.media.id, s.posts.featuredMediaId))
-      .where(and(eq(s.posts.status, "published"), isNull(s.posts.deletedAt), visible)),
+      .where(and(livePosts(), visible)),
     db
       .select({ n: count() })
       .from(s.events)

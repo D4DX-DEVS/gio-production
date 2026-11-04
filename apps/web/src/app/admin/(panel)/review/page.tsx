@@ -9,7 +9,7 @@ import { SubmitButton } from "@/lib/admin/client";
 import { Badge, Card, Field, PageHeader, Pagination, pageParam, param } from "@/lib/admin/ui";
 import { decide } from "./actions";
 
-export const metadata: Metadata = { title: "Review queue" };
+export const metadata: Metadata = { title: "Client questions" };
 
 const CODES: Record<string, string> = {
   Q1: "Post without a title",
@@ -63,7 +63,7 @@ export default async function ReviewPage({ searchParams }: { searchParams: Promi
   return (
     <>
       <PageHeader icon="review"
-        title="Review queue"
+        title="Client questions"
         description="Questions for the client. Everything was imported exactly as published on the old site. Nothing changes until someone with authority decides. Corrections must come from the client; the system never guesses them."
       />
       <div className="mb-5 flex flex-wrap gap-2">

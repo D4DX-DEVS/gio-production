@@ -1,5 +1,5 @@
 // Read-side queries for the public site. Only published, non-deleted rows are returned.
-import { and, asc, count, desc, eq, inArray, isNull, sql } from "drizzle-orm";
+import { and, asc, count, desc, eq, inArray, isNull, lte, or, sql } from "drizzle-orm";
 import { schema } from "@gio/db";
 import { currentPageLayout, mediaPublicPath } from "@gio/db/layout";
 import { getDb } from "./db";
@@ -178,7 +178,11 @@ export interface PostCard {
   categories: { slug: string; name: string }[];
 }
 
-const publishedPost = and(eq(posts.status, "published"), isNull(posts.deletedAt));
+/**
+ * Posts visitors can read: published, or scheduled with a publish date that has arrived. Built per query,
+ * so a scheduled post appears on its date without anyone pressing a button.
+ */
+export const livePosts = () => and(isNull(posts.deletedAt), or(eq(posts.status, "published"), and(eq(posts.status, "scheduled"), lte(posts.publishedAt, new Date()))));
 
 async function toCards(rows: (typeof posts.$inferSelect)[]): Promise<PostCard[]> {
   const db = getDb();
@@ -232,7 +236,7 @@ export async function listPosts(f: PostFilter, page: number, perPage: number) {
   const db = getDb();
   const ids = await filterIds(f);
   if (ids && !ids.length) return { items: [] as PostCard[], total: 0, pages: 0 };
-  const where = ids ? and(publishedPost, inArray(posts.id, ids)) : publishedPost;
+  const where = ids ? and(livePosts(), inArray(posts.id, ids)) : livePosts();
   const [{ n }] = await db.select({ n: count() }).from(posts).where(where);
   const rows = await db
     .select()
@@ -250,7 +254,7 @@ export async function latestPosts(limit: number, category?: string) {
 
 export async function getPublishedPost(slug: string) {
   const db = getDb();
-  const [p] = await db.select().from(posts).where(and(publishedPost, eq(posts.slug, slug))).limit(1);
+  const [p] = await db.select().from(posts).where(and(livePosts(), eq(posts.slug, slug))).limit(1);
   if (!p) return null;
   const [card] = await toCards([p]);
   const postTagRows = await db
@@ -342,7 +346,7 @@ export async function getPublishedEvent(slug: string) {
   if (!row) return null;
   const image = await getMedia(row.e.featuredMediaId);
   const report = row.e.reportPostId
-    ? (await db.select({ slug: posts.slug, title: posts.title }).from(posts).where(and(publishedPost, eq(posts.id, row.e.reportPostId))).limit(1))[0]
+    ? (await db.select({ slug: posts.slug, title: posts.title }).from(posts).where(and(livePosts(), eq(posts.id, row.e.reportPostId))).limit(1))[0]
     : undefined;
   return { event: row.e, venue: row.v, image, report: report ?? null };
 }
@@ -445,7 +449,7 @@ export async function sitemapEntries() {
   const db = getDb();
   const [p, ps, ev] = await Promise.all([
     db.select({ slug: pages.slug, updatedAt: pages.updatedAt }).from(pages).where(and(eq(pages.status, "published"), isNull(pages.deletedAt), eq(pages.showInSitemap, true))),
-    db.select({ slug: posts.slug, modifiedAt: posts.modifiedAt, publishedAt: posts.publishedAt }).from(posts).where(publishedPost),
+    db.select({ slug: posts.slug, modifiedAt: posts.modifiedAt, publishedAt: posts.publishedAt }).from(posts).where(livePosts()),
     db.select({ slug: events.slug, updatedAt: events.updatedAt }).from(events).where(publishedEvent),
   ]);
   return { pages: p, posts: ps, events: ev };

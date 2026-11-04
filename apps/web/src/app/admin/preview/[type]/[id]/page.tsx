@@ -20,12 +20,21 @@ import { fmtDate } from "@/lib/admin/form";
 export const metadata: Metadata = { title: "Draft preview · GIO Admin", robots: { index: false, follow: false } };
 
 function Bar({ label, status, edit }: { label: string; status: string; edit: string }) {
+  const live = status === "published";
   return (
-    <div className="sticky top-0 z-50 flex flex-wrap items-center justify-between gap-3 bg-amber-400 px-4 py-2 text-sm font-medium text-amber-950 shadow">
+    <div className={`sticky top-0 z-50 flex flex-wrap items-center justify-between gap-3 px-4 py-2 text-sm font-medium shadow ${live ? "bg-emerald-600 text-white" : "bg-amber-400 text-amber-950"}`}>
       <span>
-        Draft preview: {label} · status <strong>{status}</strong>. Visitors do not see this page.
+        {live ? (
+          <>
+            Preview: {label}. This is what visitors see now.
+          </>
+        ) : (
+          <>
+            Preview: {label} · status <strong>{status}</strong>. Visitors do not see this page.
+          </>
+        )}
       </span>
-      <Link href={edit} className="rounded-full bg-amber-950 px-4 py-1 text-xs font-semibold text-white hover:bg-black">
+      <Link href={edit} className={`rounded-full px-4 py-1 text-xs font-semibold text-white ${live ? "bg-emerald-950 hover:bg-black" : "bg-amber-950 hover:bg-black"}`}>
         ← Back to editing
       </Link>
     </div>
@@ -60,11 +69,11 @@ export default async function Preview({ params }: { params: Promise<{ type: stri
         : undefined;
     return (
       <div className="min-h-screen bg-white">
-        <Bar label={page.slug === "" ? "Homepage (draft sections)" : page.title} status={page.status} edit={page.slug === "" ? "/admin/homepage/banners/" : `/admin/pages/${id}/`} />
+        <Bar label={page.slug === "" ? "Home page" : page.title} status={page.status} edit={page.slug === "" ? "/admin/homepage/" : `/admin/pages/${id}/`} />
         {page.slug === "" && !newsRow ? (
           <p className="bg-paper px-4 py-2 text-center text-xs text-muted">The live homepage also shows the latest news and events between these sections.</p>
         ) : null}
-        {layout.sections.length ? <Sections layout={layout} pageTitle={page.title} inserts={inserts} /> : <Container className="py-16 text-center text-muted">No visible sections in the draft.</Container>}
+        {layout.sections.length ? <Sections layout={layout} pageTitle={page.title} inserts={inserts} /> : <Container className="py-16 text-center text-muted">No visible sections yet.</Container>}
       </div>
     );
   }

@@ -18,7 +18,7 @@ type Post = typeof schema.posts.$inferSelect;
 const STATUS_LABEL: Record<(typeof POST_STATUSES)[number], { label: string; hint: string }> = {
   draft: { label: "Draft", hint: "Saved, not on the website" },
   review: { label: "Ready for review", hint: "An editor checks it before it goes live" },
-  scheduled: { label: "Scheduled", hint: "Goes live on the publish date" },
+  scheduled: { label: "Scheduled", hint: "Goes live by itself on the publish date below" },
   published: { label: "Published", hint: "Visible on the website" },
   private: { label: "Private", hint: "Only people who sign in can see it" },
   archived: { label: "Archived", hint: "Hidden, kept for the record" },
@@ -27,7 +27,10 @@ const STATUS_LABEL: Record<(typeof POST_STATUSES)[number], { label: string; hint
 export async function PostForm({ user, post, categoryIds = [] }: { user: AdminUser; post?: Post; categoryIds?: number[] }) {
   const db = getDb();
   const [categories, previews] = await Promise.all([db.select().from(schema.categories).orderBy(asc(schema.categories.name)), mediaPreviews(db, [post?.featuredMediaId])]);
-  const statuses = hasRole(user, "editor") ? POST_STATUSES : (["draft", "review"] as const);
+  // Editors choose between Draft, Scheduled and Published. Contributors can only save a draft or hand it over for review.
+  // A story that already has another status keeps it as an extra choice, so saving never changes it by accident.
+  const statuses: (typeof POST_STATUSES)[number][] = hasRole(user, "editor") ? ["draft", "scheduled", "published"] : ["draft", "review"];
+  if (post && !statuses.includes(post.status)) statuses.push(post.status);
   const save = savePost.bind(null, post?.id ?? null);
 
   return (
@@ -75,7 +78,7 @@ export async function PostForm({ user, post, categoryIds = [] }: { user: AdminUs
         <div className="space-y-6">
           <Card title="Status">
             <RadioCards name="status" defaultValue={post?.status ?? "draft"} options={statuses.map((s) => ({ value: s, ...STATUS_LABEL[s] }))} />
-            <Field label="Publish date (India time)" hint="Leave empty to use the moment it is published." className="mt-4">
+            <Field label="Publish date (India time)" hint="Needed for Scheduled. For Published, leave it empty to use the moment you save." className="mt-4">
               <input type="datetime-local" name="publishedAt" defaultValue={toIstInput(post?.publishedAt)} className="field" />
             </Field>
           </Card>

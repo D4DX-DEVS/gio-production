@@ -147,6 +147,7 @@ function AboutSection({ text, poster }: { text: LayoutSection | null; poster: La
               {buttonLabel && buttonUrl ? (
                 <a
                   href={buttonUrl}
+                  lang={langOf(buttonLabel)}
                   className="btn-fx shine group mt-3 inline-flex items-center gap-3 rounded-full bg-brand-600 px-7 py-3.5 text-base font-semibold text-white shadow-lg shadow-brand-700/30 transition hover:bg-brand-700"
                   {...(external ? { target: "_blank", rel: "noopener noreferrer" } : {})}
                 >
@@ -294,7 +295,7 @@ function Section({ section: s, pageTitle }: { section: LayoutSection; pageTitle?
       // slides exactly one, and spacing is padding (not gap), so the end meets the start with no break.
       const loop = Array.from({ length: Math.ceil(24 / logos.length) }, () => logos).flat();
       return (
-        <section className="py-9 sm:py-12">
+        <section className="bg-paper py-9 sm:py-12">
           {title ? (
             <Container>
               <p className="reveal mb-5 flex items-center justify-center gap-3 text-xs font-semibold uppercase tracking-[0.2em] text-muted sm:mb-7 sm:text-sm">
@@ -304,18 +305,22 @@ function Section({ section: s, pageTitle }: { section: LayoutSection; pageTitle?
               </p>
             </Container>
           ) : null}
-          <div className="reveal group relative overflow-hidden [mask-image:linear-gradient(to_right,transparent,black_8%,black_92%,transparent)]">
-            <div className="flex w-max animate-[marquee_60s_linear_infinite] group-hover:[animation-play-state:paused]" style={{ animationDuration: `${Math.round(loop.length * 2.6)}s` }}>
+          {/* Vertical padding leaves room for the cards' shadow and hover lift inside the clipped row. */}
+          <div className="reveal group relative overflow-hidden py-4 [mask-image:linear-gradient(to_right,transparent,black_8%,black_92%,transparent)]">
+            <div className="flex w-max animate-[marquee_60s_linear_infinite] group-hover:[animation-play-state:paused]" style={{ animationDuration: `${Math.round(loop.length * 7.5)}s` }}>
               {[0, 1].map((n) => (
                 <div key={n} className="flex shrink-0" aria-hidden={n === 1 || undefined}>
                   {loop.map(({ i, m }, k) => (
-                    <div key={`${i.id}-${k}`} className="lit flex h-16 w-32 shrink-0 items-center justify-center rounded-xl px-4 lg:h-20 lg:w-44 lg:px-6" aria-hidden={k >= logos.length || undefined}>
-                      <img
-                        src={m!.url}
-                        alt={n === 0 && k < logos.length ? m!.alt : ""}
-                        className="max-h-14 w-auto max-w-full object-contain transition duration-300 ease-(--ease-soft) hover:scale-110 hover:opacity-80 hover:grayscale lg:max-h-16"
-                        loading="lazy"
-                      />
+                    // Spacing between cards is the wrapper's padding, not a gap, so each copy of the row stays exactly one loop wide.
+                    <div key={`${i.id}-${k}`} className="shrink-0 px-2 sm:px-2.5 lg:px-3" aria-hidden={k >= logos.length || undefined}>
+                      <div className="lit flex h-28 w-48 items-center justify-center rounded-2xl bg-gradient-to-b from-white to-brand-50/70 px-5 shadow-card ring-1 ring-line transition duration-300 ease-(--ease-soft) hover:-translate-y-1 hover:shadow-lift hover:ring-brand-200 sm:h-32 sm:w-56 lg:h-36 lg:w-64 lg:px-7">
+                        <img
+                          src={m!.url}
+                          alt={n === 0 && k < logos.length ? m!.alt : ""}
+                          className="max-h-20 w-auto max-w-full object-contain transition duration-300 ease-(--ease-soft) hover:scale-105 sm:max-h-24 lg:max-h-28"
+                          loading="lazy"
+                        />
+                      </div>
                     </div>
                   ))}
                 </div>

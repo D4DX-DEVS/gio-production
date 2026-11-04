@@ -2,7 +2,7 @@
 
 /* GIO Kerala identity: every colour comes from the logo's blues (bright #0898e8 down to deep #0868a8).
    brand = the logo's mid to deep blues (text, buttons, dark surfaces); accent = its bright blue (eyebrows,
-   highlights, call-to-action buttons); danger = red, kept only for errors and delete actions. */
+   highlights, call-to-action buttons); danger = red, kept for errors and delete actions and the homepage video band (.video-band). */
 @theme {
   --color-brand-50: #eaf5fd;
   --color-brand-100: #cfe8fa;
@@ -84,6 +84,13 @@ html:has(dialog[open]) { overflow: hidden; }
   :where(h1, h2, h3, h4, h5, h6):lang(ml) { line-height: 1.5; }
 }
 
+/* Malayalam text on the public site is one size: 16px on desktop, 14px below it (titles, excerpts, buttons and
+   rich text alike). Components mark Malayalam with lang="ml" (langOf in lib/text.ts); :lang() also reaches everything
+   inside such an element. In px on purpose, so the desktop root scale above does not change it. Outside the layer
+   stack so no Tailwind size utility or .prose-gio rule can override it. */
+body:has(main[data-site]) :lang(ml) { font-size: 14px; }
+@media (min-width: 64rem) { body:has(main[data-site]) :lang(ml) { font-size: 16px; } }
+
 body {
   background: #fff;
   color: var(--color-ink);
@@ -127,6 +134,18 @@ body {
 .prose-gio figure { margin: 1em 0; }
 .prose-gio figcaption { font-size: 0.875rem; color: var(--color-muted); text-align: center; margin-top: 0.5rem; }
 .prose-gio table { width: 100%; border-collapse: collapse; }
+/* Pieces the admin text editor adds: buttons, alignment, video blocks, tables. */
+.prose-gio .ta-left { text-align: left; }
+.prose-gio .ta-center { text-align: center; }
+.prose-gio .ta-right { text-align: right; }
+.prose-gio a.gio-btn { display: inline-block; background: var(--color-brand-600); color: #fff; font-weight: 600; line-height: 1.3; text-decoration: none; padding: 0.65rem 1.5rem; border-radius: 9999px; transition: background-color 0.2s, color 0.2s, transform 0.2s var(--ease-soft); }
+.prose-gio a.gio-btn:hover { background: var(--color-brand-700); color: #fff; }
+.prose-gio a.gio-btn:active { transform: scale(0.97); }
+.prose-gio a.gio-btn-outline { background: transparent; color: var(--color-brand-700); box-shadow: inset 0 0 0 2px var(--color-brand-600); }
+.prose-gio a.gio-btn-outline:hover { background: var(--color-brand-50); color: var(--color-brand-800); }
+.prose-gio .gio-embed { margin: 1em 0; }
+.prose-gio th { background: var(--color-paper); text-align: left; font-weight: 600; }
+
 .prose-gio td, .prose-gio th { border: 1px solid var(--color-line); padding: 0.5rem 0.65rem; }
 
 /* Admin form controls */
@@ -485,8 +504,17 @@ body {
   :is(.lit, .shine, .btn-fx, main[data-site] .btn):hover::before { opacity: 1; }
   :is(.lit, .shine, .btn-fx, main[data-site] .btn):hover::after { opacity: 1; translate: 380% 0; transition: translate 0.9s var(--ease-soft); }
   .lit:hover img { filter: brightness(1.06) saturate(1.1); }
+  /* Cards whose whole face is one stretched link (after:inset-0) swallow the pointer, so their picture frame
+     (.lit-card) lights up while the card (.group) is hovered instead. */
+  .group:hover .lit-card::before { opacity: 1; }
+  .group:hover .lit-card::after { opacity: 1; translate: 380% 0; transition: translate 0.9s var(--ease-soft); }
+  .group:hover .lit-card img { filter: brightness(1.06) saturate(1.1); }
 }
 .lit img { transition: filter 0.4s var(--ease-soft), transform 0.6s var(--ease-soft); }
+/* Leader photos turn grayscale while their card is hovered (more specific than the .lit brightness boost above). */
+@media (hover: hover) {
+  .group:hover .gray-hover img { filter: grayscale(1); }
+}
 @media (prefers-reduced-motion: reduce) {
   :is(.lit, .shine, .btn-fx, main[data-site] .btn)::after { display: none; }
 }
@@ -507,4 +535,42 @@ body {
 
 @media print {
   .hero-enter, .enter-up { animation: none !important; opacity: 1 !important; translate: none !important; scale: none !important; }
+}
+
+/* The admin text editor's writing area: looks like the website, with the video player held still. */
+.rich-surface { outline: none; }
+.rich-surface .gio-embed iframe { pointer-events: none; }
+.rich-surface .gio-embed { user-select: none; outline: 1px dashed var(--color-line); outline-offset: 2px; }
+.rich-surface td, .rich-surface th { min-width: 3rem; }
+.rich-surface a { cursor: text; }
+.rich-surface img { cursor: default; }
+.rich-surface:empty::before { content: attr(data-placeholder); color: var(--color-muted); }
+
+/* Homepage video section (ChannelVideos.tsx, with the decoration in VideoBackdrop.tsx): blue on the left running
+   into red on the right, with a blue glow top left and a red one bottom right. Kept dark so white text and the
+   cards read clearly; the red is the logo-adjacent danger red, used here on purpose for the video band. */
+.video-band {
+  background-color: var(--color-brand-900);
+  background-image:
+    radial-gradient(55% 70% at 0% 0%, rgb(31 147 224 / 0.42), transparent 70%),
+    radial-gradient(55% 75% at 100% 100%, rgb(224 39 42 / 0.5), transparent 70%),
+    linear-gradient(
+      115deg,
+      var(--color-brand-900) 0%,
+      var(--color-brand-800) 30%,
+      color-mix(in oklab, var(--color-brand-800) 50%, var(--color-danger-700)) 65%,
+      var(--color-danger-700) 100%
+    );
+}
+/* Equalizer bars in the video band breathe up and down; at rest they keep their heights. */
+@keyframes eq-bar {
+  0%, 100% { scale: 1 0.35; }
+  50% { scale: 1 1; }
+}
+@media (prefers-reduced-motion: no-preference) {
+  .eq-bar {
+    transform-origin: bottom;
+    animation: eq-bar calc(0.9s + var(--i, 0) * 70ms) ease-in-out infinite;
+    animation-delay: calc(var(--i, 0) * -130ms);
+  }
 }

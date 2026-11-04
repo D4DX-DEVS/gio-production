@@ -40,6 +40,69 @@ export function Card({ title, description, aside, children, className = "" }: { 
   );
 }
 
+/** Tells the editor, near the top of a screen, that saving here changes the website at once. */
+export function LiveNote({ children, viewHref, viewLabel = "See it on the website" }: { children?: ReactNode; viewHref?: string; viewLabel?: string }) {
+  return (
+    <div className="mb-6 flex flex-wrap items-center gap-x-4 gap-y-2 rounded-2xl bg-emerald-50 px-4 py-3 text-sm text-emerald-950 ring-1 ring-emerald-200">
+      <span aria-hidden className="relative flex h-2.5 w-2.5 shrink-0">
+        <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-emerald-500 opacity-60" />
+        <span className="relative inline-flex h-2.5 w-2.5 rounded-full bg-emerald-600" />
+      </span>
+      <p className="min-w-0 flex-1 basis-64">{children ?? <>Each section has its own <strong>Save</strong> button. When you save, the change is on the website straight away.</>}</p>
+      {viewHref ? (
+        <a href={viewHref} target="_blank" rel="noopener" className="inline-flex min-h-11 items-center gap-1.5 font-semibold text-emerald-900 underline underline-offset-4">
+          {viewLabel} <AdminIcon name="external" className="h-4 w-4" />
+        </a>
+      ) : null}
+    </div>
+  );
+}
+
+/**
+ * One editable part of a website page: a header that says what it is, then the section's own form
+ * (SectionForm) with its own Save button. No overflow clipping, so the Save bar can stick to the screen bottom.
+ */
+export function SectionCard({
+  id,
+  icon,
+  title,
+  subtitle,
+  status,
+  actions,
+  children,
+}: {
+  id?: string;
+  icon: AdminIconName;
+  title: string;
+  subtitle?: ReactNode;
+  /** "Showing" / "Hidden" style pill. */
+  status?: ReactNode;
+  actions?: ReactNode;
+  children: ReactNode;
+}) {
+  return (
+    <section id={id} className="scroll-mt-24 rounded-2xl border border-line bg-white shadow-sm">
+      <header className="flex flex-wrap items-center gap-3 rounded-t-2xl border-b border-line bg-paper/60 px-5 py-4">
+        <span className="grid h-10 w-10 shrink-0 place-items-center rounded-xl bg-brand-50 text-brand-600 ring-1 ring-inset ring-brand-100">
+          <AdminIcon name={icon} className="h-5 w-5" />
+        </span>
+        <div className="min-w-0 flex-1 basis-48">
+          <h2 className="truncate text-lg font-semibold leading-tight text-brand-900">{title}</h2>
+          {subtitle ? <p className="text-sm text-muted">{subtitle}</p> : null}
+        </div>
+        {status}
+        {actions}
+      </header>
+      {children}
+    </section>
+  );
+}
+
+/** The padded area of a SectionCard that holds the fields. */
+export function CardBody({ children, className = "" }: { children: ReactNode; className?: string }) {
+  return <div className={`space-y-5 p-5 sm:p-6 ${className}`}>{children}</div>;
+}
+
 /** Pill tabs for switching between the parts of one website section. */
 export function SectionTabs({ tabs }: { tabs: { href: string; label: string; active: boolean; count?: number }[] }) {
   return (
@@ -130,7 +193,7 @@ export function ChipCheckbox({ name, value, label, defaultChecked = false }: { n
 /** Save bar pinned to the bottom of a long form, so Save is always in reach. `aside` holds the delete button. */
 export function FormActions({ children, aside }: { children: ReactNode; aside?: ReactNode }) {
   return (
-    <div className="sticky bottom-0 z-20 -mx-4 mt-8 flex flex-wrap items-center justify-between gap-3 border-t border-line bg-white/90 px-4 py-3 backdrop-blur sm:-mx-8 sm:px-8 lg:bottom-4 lg:mx-0 lg:rounded-2xl lg:border lg:px-5 lg:shadow-lg lg:shadow-brand-900/10">
+    <div className="sticky bottom-0 z-20 -mx-[15px] mt-8 flex flex-wrap items-center justify-between gap-3 border-t border-line bg-white/90 px-[15px] py-3 backdrop-blur lg:bottom-4 lg:mx-0 lg:rounded-2xl lg:border lg:px-5 lg:shadow-lg lg:shadow-brand-900/10">
       <div>{aside}</div>
       <div className="flex flex-wrap items-center gap-2">{children}</div>
     </div>

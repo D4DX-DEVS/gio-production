@@ -1,31 +1,19 @@
 "use server";
 // Save and delete for the three homepage blocks with their own screens: About text, About poster
-// (the picture on its right) and the Instagram feed. Like every homepage edit they change the draft;
-// the website changes when the homepage is published.
+// (the picture on its right) and the Instagram feed, plus the order-and-look builder. Like every page edit
+// they end with goLive, so the website changes the moment the editor saves.
 import { and, eq, gte, inArray, max, sql } from "drizzle-orm";
-import { publishPageLayout } from "@gio/db/layout";
 import { schema as s } from "@gio/db";
 import { getDb } from "@/lib/db";
 import { sanitize } from "@/lib/sanitize";
-import { audit, done, fail, requireRole } from "@/lib/admin/guard";
+import { audit, requireRole } from "@/lib/admin/guard";
 import { bool, errorMessage, FormError, int, isRedirect, link, oneOf, str } from "@/lib/admin/form";
 import { findHomePage, parseData, type HomeSection, pickSections } from "@/lib/admin/homepage";
 import { groupSections, loadBuilderState, type Group } from "@/lib/admin/homepage-builder";
 import { NEWS_KEY, type BuilderResult } from "@/lib/admin/homepage-blocks";
+import { goLive } from "@/lib/admin/live";
+import { runSave, type SaveResult } from "@/lib/admin/result";
 import { BG_OPTIONS, DEFAULT_STYLE, DEVICE_OPTIONS, SPACE_OPTIONS, readStyle } from "@/lib/section-style";
-
-const BACK_ABOUT = "/admin/homepage/about/";
-const BACK_INSTAGRAM = "/admin/homepage/instagram/";
-const SAVED = "Saved to the draft. Click “Publish homepage” to put it on the website.";
-
-async function attempt(path: string, fn: () => Promise<void>) {
-  try {
-    await fn();
-  } catch (e) {
-    if (isRedirect(e)) throw e;
-    fail(path, errorMessage(e));
-  }
-}
 
 /** The homepage and its current sections (with parsed data). */
 async function load() {
@@ -46,9 +34,9 @@ async function sortAfterBanners(pageId: number) {
   return (row?.m ?? 0) + 1;
 }
 
-export async function saveAboutText(fd: FormData) {
+export async function saveAboutText(_prev: SaveResult | null, fd: FormData): Promise<SaveResult> {
   const { user } = await requireRole("editor");
-  await attempt(BACK_ABOUT, async () => {
+  return runSave(async () => {
     const { db, home, aboutText } = await load();
     const heading = str(fd, "heading");
     const html = sanitize(str(fd, "html") ?? "");
@@ -67,24 +55,25 @@ export async function saveAboutText(fd: FormData) {
         .returning({ id: s.sections.id });
       await audit(user.id, "create", "section", row.id, "homepage about text");
     }
+    await goLive(db, home.id, user.id);
   });
-  done(BACK_ABOUT, SAVED);
 }
 
-export async function deleteAboutText() {
+export async function deleteAboutText(): Promise<SaveResult> {
   const { user } = await requireRole("admin");
-  await attempt(BACK_ABOUT, async () => {
-    const { db, aboutText } = await load();
+  return runSave(async () => {
+    const { db, home, aboutText } = await load();
     if (!aboutText) throw new FormError("There is no About text to delete.");
     await db.delete(s.sections).where(eq(s.sections.id, aboutText.id));
     await audit(user.id, "delete", "section", aboutText.id, "homepage about text");
+    await goLive(db, home.id, user.id);
+    return "About text deleted. It is gone from the website.";
   });
-  done(BACK_ABOUT, "About text deleted from the draft. Publish the homepage to remove it from the website.");
 }
 
-export async function saveAboutPoster(fd: FormData) {
+export async function saveAboutPoster(_prev: SaveResult | null, fd: FormData): Promise<SaveResult> {
   const { user } = await requireRole("editor");
-  await attempt(BACK_ABOUT, async () => {
+  return runSave(async () => {
     const { db, home, aboutPoster, aboutText } = await load();
     const mediaId = int(fd, "mediaId");
     const isVisible = bool(fd, "isVisible");
@@ -107,30 +96,31 @@ export async function saveAboutPoster(fd: FormData) {
     if (item) await db.update(s.sectionItems).set(values).where(eq(s.sectionItems.id, item.id));
     else await db.insert(s.sectionItems).values({ sectionId, sort: 1, ...values, source: "manual" });
     await audit(user.id, aboutPoster ? "update" : "create", "section", sectionId, "homepage about poster");
+    await goLive(db, home.id, user.id);
   });
-  done(BACK_ABOUT, SAVED);
 }
 
-export async function deleteAboutPoster() {
+export async function deleteAboutPoster(): Promise<SaveResult> {
   const { user } = await requireRole("admin");
-  await attempt(BACK_ABOUT, async () => {
-    const { db, aboutPoster } = await load();
+  return runSave(async () => {
+    const { db, home, aboutPoster } = await load();
     if (!aboutPoster) throw new FormError("There is no poster to delete.");
     await db.delete(s.sections).where(eq(s.sections.id, aboutPoster.id));
     await audit(user.id, "delete", "section", aboutPoster.id, "homepage about poster");
+    await goLive(db, home.id, user.id);
+    return "Poster deleted. It is gone from the website.";
   });
-  done(BACK_ABOUT, "Poster deleted from the draft. Publish the homepage to remove it from the website.");
 }
 
-export async function saveInstagram(fd: FormData) {
+export async function saveInstagram(_prev: SaveResult | null, fd: FormData): Promise<SaveResult> {
   const { user } = await requireRole("editor");
-  await attempt(BACK_INSTAGRAM, async () => {
+  return runSave(async () => {
     const { db, home, secs, instagram } = await load();
     const raw = str(fd, "profileUrl") ?? "";
     const handle = raw.match(/instagram\.com\/([A-Za-z0-9._]+)/i)?.[1] ?? (/^@?[A-Za-z0-9._]+$/.test(raw) ? raw.replace(/^@/, "") : null);
     if (!handle) throw new FormError("Paste the Instagram page link, for example https://www.instagram.com/gio_keralam/");
-    const count = int(fd, "count") ?? 6;
-    if (count < 3 || count > 12) throw new FormError("Posts to show must be between 3 and 12.");
+    const count = int(fd, "count") ?? 8;
+    if (count < 4 || count > 12) throw new FormError("Posts to show must be between 4 and 12.");
     const data = { ...(instagram?.data ?? {}), handle, profileUrl: `https://www.instagram.com/${handle}/`, count, mode: "embed" };
     const title = str(fd, "title");
     if (instagram) {
@@ -152,25 +142,26 @@ export async function saveInstagram(fd: FormData) {
         .returning({ id: s.sections.id });
       await audit(user.id, "create", "section", row.id, "homepage instagram");
     }
+    await goLive(db, home.id, user.id);
   });
-  done(BACK_INSTAGRAM, SAVED);
 }
 
-export async function deleteInstagram() {
+export async function deleteInstagram(): Promise<SaveResult> {
   const { user } = await requireRole("admin");
-  await attempt(BACK_INSTAGRAM, async () => {
-    const { db, instagram } = await load();
+  return runSave(async () => {
+    const { db, home, instagram } = await load();
     if (!instagram) throw new FormError("There is no Instagram section to delete.");
     await db.delete(s.sections).where(eq(s.sections.id, instagram.id));
     await audit(user.id, "delete", "section", instagram.id, "homepage instagram");
+    await goLive(db, home.id, user.id);
+    return "Instagram section deleted. It is gone from the website.";
   });
-  done(BACK_INSTAGRAM, "Instagram section deleted from the draft. Publish the homepage to remove it from the website.");
 }
 
 // ---------------------------------------------------------------------------
-// Home page builder. These are called from the builder screen (not from a <form>), so they return the
-// fresh builder state instead of redirecting, and report problems as { ok: false } instead of a flash.
-// Like every homepage edit they change the draft; the website changes when the homepage is published.
+// Home page builder (order and look). These are called from the builder screen (not from a <form>), so they return
+// the fresh builder state instead of redirecting, and report problems as { ok: false } instead of a flash.
+// Every successful change goes live at once (see build()).
 // ---------------------------------------------------------------------------
 
 type DbHandle = ReturnType<typeof getDb>;
@@ -183,6 +174,7 @@ async function build(pageId: number, message: string, fn: (db: DbHandle, userId:
     const home = await findHomePage(db);
     if (!home || home.id !== pageId) throw new FormError("This is not the homepage.");
     const key = await fn(db, user.id);
+    await goLive(db, home.id, user.id);
     return { ok: true, message, key: key || undefined, state: await loadBuilderState(db, home.id) };
   } catch (e) {
     if (isRedirect(e)) throw e;
@@ -249,7 +241,7 @@ async function applyOrder(db: DbHandle, pageId: number, userId: string, keys: st
 
 /** Set the whole order at once (drag and drop). `keys` are builder block keys, top to bottom. */
 export async function reorderSections(pageId: number, keys: string[]): Promise<BuilderResult> {
-  return build(pageId, "Order saved to the draft.", async (db, userId) => {
+  return build(pageId, "Order saved. The website shows it now.", async (db, userId) => {
     if (!Array.isArray(keys) || keys.some((k) => typeof k !== "string")) throw new FormError("The order could not be read.");
     await applyOrder(db, pageId, userId, keys);
   });
@@ -257,7 +249,7 @@ export async function reorderSections(pageId: number, keys: string[]): Promise<B
 
 /** Move one block to a position (0 = top). Arrow buttons and "Move to top / bottom" use this. */
 export async function moveSection(pageId: number, key: string, toIndex: number): Promise<BuilderResult> {
-  return build(pageId, "Order saved to the draft.", async (db, userId) => {
+  return build(pageId, "Order saved. The website shows it now.", async (db, userId) => {
     const state = await loadBuilderState(db, pageId);
     const keys = state.blocks.map((b) => b.key);
     // "news" is the placeholder key of the latest-news block before it has a row; after that it has its own key.
@@ -274,7 +266,7 @@ export async function moveSection(pageId: number, key: string, toIndex: number):
 
 /** Show or hide a block on the website (every row of it). */
 export async function setBlockVisible(pageId: number, key: string, visible: boolean): Promise<BuilderResult> {
-  return build(pageId, visible ? "Shown. Publish to put it on the website." : "Hidden. Publish to take it off the website.", async (db, userId) => {
+  return build(pageId, visible ? "Shown. It is on the website now." : "Hidden. It is off the website now.", async (db, userId) => {
     const g = await resolveGroup(db, pageId, key, userId);
     await db.update(s.sections).set({ isVisible: !!visible, updatedAt: new Date() }).where(inArray(s.sections.id, g.rows.map((r) => r.id)));
     await audit(userId, "update", "section", g.primary.id, `homepage ${visible ? "show" : "hide"} ${g.kind}`);
@@ -292,7 +284,7 @@ export async function setBlockVisible(pageId: number, key: string, visible: bool
  * Other keys in the section's data are left alone.
  */
 export async function saveSectionStyle(pageId: number, key: string, fd: FormData): Promise<BuilderResult> {
-  return build(pageId, "Saved to the draft. Publish to put it on the website.", async (db, userId) => {
+  return build(pageId, "Saved. The website shows it now.", async (db, userId) => {
     const g = await resolveGroup(db, pageId, key, userId);
     const row = g.primary;
     const data = parseData(row.dataJson);
@@ -345,7 +337,7 @@ export async function saveSectionStyle(pageId: number, key: string, fd: FormData
 
 /** Add a block from the "Add" menu. Only the kinds that make sense to add by themselves are offered. */
 export async function addHomeSection(pageId: number, type: "latest_posts" | "rich_text"): Promise<BuilderResult> {
-  return build(pageId, type === "latest_posts" ? "Latest news added to the draft." : "Text block added, hidden until you write something in it.", async (db, userId) => {
+  return build(pageId, type === "latest_posts" ? "Latest news added. The website shows it now." : "Text block added. It stays hidden until you write something in it.", async (db, userId) => {
     if (type === "latest_posts") {
       const groups = await homeGroups(db, pageId);
       if (groups.some((g) => g.kind === "news")) throw new FormError("The homepage already has a latest news block.");
@@ -362,13 +354,5 @@ export async function addHomeSection(pageId: number, type: "latest_posts" | "ric
     const state = await loadBuilderState(db, pageId);
     await applyOrder(db, pageId, userId, state.blocks.map((b) => b.key));
     return `s${row.id}`;
-  });
-}
-
-/** Publish the homepage draft (same snapshot as the Publish button on the other homepage screens). */
-export async function publishHomepage(pageId: number): Promise<BuilderResult> {
-  return build(pageId, "Published. The website now shows these sections.", async (db, userId) => {
-    const layoutId = await publishPageLayout(db, pageId, userId);
-    await audit(userId, "publish", "page", pageId, `layout ${layoutId}`);
   });
 }

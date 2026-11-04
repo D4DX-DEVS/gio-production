@@ -43,9 +43,9 @@ export async function LeadersPage({ page }: { page: PageRow }) {
     <>
       <PageHero title={page.title} eyebrow="Our Leaders" crumbs={[{ href: `/${page.slug}/`, label: page.title }]} />
       <div className="sticky top-(--header-h) z-30 border-b border-line bg-white/90 backdrop-blur">
-        <Container className="flex gap-2 overflow-x-auto py-2">
+        <Container className="flex gap-2 overflow-x-auto py-2 sm:justify-center">
           {LEADER_NAV.map((l) => (
-            <Link key={l.href} href={l.href} aria-current={l.scope === scope ? "page" : undefined} className={`btn-fx whitespace-nowrap rounded-full px-4 py-1.5 text-sm font-semibold sm:text-[0.9375rem] ${l.scope === scope ? "bg-brand-600 text-white" : "bg-brand-50 text-brand-700 hover:bg-brand-100"}`}>
+            <Link key={l.href} href={l.href} aria-current={l.scope === scope ? "page" : undefined} className={`btn-fx shrink-0 whitespace-nowrap rounded-full px-4 py-1.5 text-sm font-semibold sm:text-[0.9375rem] ${l.scope === scope ? "bg-brand-600 text-white" : "bg-brand-50 text-brand-700 hover:bg-brand-100"}`}>
               {l.label}
             </Link>
           ))}
@@ -54,19 +54,15 @@ export async function LeadersPage({ page }: { page: PageRow }) {
       <Container className="py-8 sm:py-10">
         {!total && <EmptyState title="No leaders published for this page yet." />}
         {scope === "former" ? (
-          <div className="relative space-y-9 border-l-2 border-brand-100 pl-6 sm:pl-10">
+          <div className="reveal-group grid gap-5 sm:grid-cols-2 lg:grid-cols-3 lg:gap-6">
             {[...groups].reverse().map((g) => (
-              <section key={g.id} className="relative">
-                <span className="absolute -left-[33px] top-1 h-4 w-4 rounded-full border-4 border-white bg-accent-600 shadow sm:-left-[49px]" />
-                <h2 className="reveal mb-4 font-display text-lg font-bold text-brand-800 sm:text-xl">{g.heading ?? g.termLabel}</h2>
-                <LeaderGrid leaders={g.leaders} compact />
-              </section>
+              <FormerGroup key={g.id} group={g} />
             ))}
           </div>
         ) : (
           groups.map((g) => (
             <section key={g.id} className="mb-9 last:mb-0">
-              {g.heading && <h2 className="reveal mb-4 font-display text-lg font-bold text-brand-800 sm:text-xl">{g.heading}</h2>}
+              {g.heading && <h2 className="reveal mb-4 text-center font-display text-lg font-bold text-brand-800 sm:text-xl">{g.heading}</h2>}
               <LeaderGrid leaders={g.leaders} featuredFirst={scope === "state"} />
             </section>
           ))
@@ -76,7 +72,29 @@ export async function LeadersPage({ page }: { page: PageRow }) {
   );
 }
 
-function LeaderGrid({ leaders, compact = false, featuredFirst = false }: { leaders: Awaited<ReturnType<typeof getLeaderGroups>>[number]["leaders"]; compact?: boolean; featuredFirst?: boolean }) {
+type LeaderGroup = Awaited<ReturnType<typeof getLeaderGroups>>[number];
+type Leader = LeaderGroup["leaders"][number];
+
+/** One term of former leaders: the year on top, its leaders side by side underneath, as one group card. */
+function FormerGroup({ group }: { group: LeaderGroup }) {
+  return (
+    <section className="flex flex-col rounded-3xl border border-line bg-gradient-to-b from-brand-50 to-white p-4 shadow-card sm:p-5">
+      <h2 className="mb-4 text-center">
+        <span className="inline-block rounded-full bg-brand-600 px-4 py-1 font-display text-sm font-bold text-white shadow-sm shadow-brand-600/25 sm:text-base">{group.heading ?? group.termLabel}</span>
+      </h2>
+      <div className="flex flex-1 flex-wrap items-start justify-center gap-3 sm:gap-4">
+        {group.leaders.map((l) => (
+          <div key={l.id} className="w-[calc((100%_-_0.75rem)/2)] sm:w-[calc((100%_-_1rem)/2)]">
+            <LeaderCard l={l} />
+          </div>
+        ))}
+      </div>
+    </section>
+  );
+}
+
+/** Leaders in rows of 2 / 4 / 6; a last row with fewer cards stays centred instead of hugging the left edge. */
+function LeaderGrid({ leaders, featuredFirst = false }: { leaders: Leader[]; featuredFirst?: boolean }) {
   const featured = featuredFirst ? leaders.slice(0, 2) : [];
   const rest = featuredFirst ? leaders.slice(2) : leaders;
   return (
@@ -88,9 +106,9 @@ function LeaderGrid({ leaders, compact = false, featuredFirst = false }: { leade
           ))}
         </div>
       )}
-      <div className={`grid gap-3 sm:gap-4 lg:gap-5 ${compact ? "grid-cols-2 min-[480px]:grid-cols-3 sm:grid-cols-4 lg:grid-cols-6" : "grid-cols-2 sm:grid-cols-4 lg:grid-cols-6"}`}>
+      <div className="flex flex-wrap justify-center gap-3 sm:gap-4 lg:gap-5">
         {rest.map((l) => (
-          <div key={l.id} className="reveal">
+          <div key={l.id} className="reveal w-[calc((100%_-_0.75rem)/2)] sm:w-[calc((100%_-_3rem)/4)] lg:w-[calc((100%_-_6.25rem)/6)]">
             <LeaderCard l={l} />
           </div>
         ))}
@@ -99,10 +117,10 @@ function LeaderGrid({ leaders, compact = false, featuredFirst = false }: { leade
   );
 }
 
-function LeaderCard({ l, large = false }: { l: Awaited<ReturnType<typeof getLeaderGroups>>[number]["leaders"][number]; large?: boolean }) {
+function LeaderCard({ l, large = false }: { l: Leader; large?: boolean }) {
   return (
     <article className="card-lift group h-full overflow-hidden rounded-2xl border border-line bg-white text-center shadow-card hover:border-brand-200">
-      <div className={`lit aspect-square overflow-hidden bg-brand-50 ${l.photo ? "skeleton" : ""}`}>
+      <div className={`lit gray-hover aspect-square overflow-hidden bg-brand-50 ${l.photo ? "skeleton" : ""}`}>
         <Img media={l.photo} alt={l.name} className="zoom-media reveal-img h-full w-full object-cover object-top" fallbackLabel={`No photo published for ${l.name}`} />
       </div>
       <div className={large ? "p-3.5 sm:p-4" : "p-2.5 sm:p-3"}>

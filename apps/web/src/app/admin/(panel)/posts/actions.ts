@@ -23,6 +23,8 @@ export async function savePost(id: number | null, fd: FormData) {
     if (!hasRole(user, "editor") && status !== "draft" && status !== "review") status = "review";
     let publishedAt = istDate(fd, "publishedAt");
     if (status === "published" && !publishedAt) publishedAt = new Date();
+    if (status === "scheduled" && !publishedAt) throw new FormError("Choose the publish date and time for a scheduled story.");
+    if (status === "scheduled" && publishedAt && publishedAt.getTime() <= Date.now()) throw new FormError("The publish date has already passed. Pick a time in the future, or choose Published.");
 
     const values = {
       title,

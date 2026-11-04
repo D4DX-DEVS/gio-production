@@ -39,8 +39,6 @@ export interface BuilderBlock {
 export interface BuilderState {
   homeId: number;
   blocks: BuilderBlock[];
-  unpublished: boolean;
-  publishedAt: number | null;
 }
 
 export interface BuilderResult {

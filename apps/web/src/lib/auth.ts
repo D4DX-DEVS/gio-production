@@ -18,6 +18,7 @@ import { hashPassword } from "better-auth/crypto";
 import { nextCookies } from "better-auth/next-js";
 import { eq } from "drizzle-orm";
 import { cookies, headers } from "next/headers";
+import { cache } from "react";
 import { schema } from "@gio/db";
 import { getDb, getEnv } from "@/lib/db";
 import { checkThrottle, clearKey, GLOBAL_KEY, GLOBAL_RULE, IP_RULE, recordFailure } from "@/lib/admin/login-throttle";
@@ -227,7 +228,7 @@ export async function signOutAdmin() {
  * The signed-in admin, or null. Valid only for the env admin's session, and only while the
  * session's binding cookie matches the current env credentials.
  */
-export async function getAdminUser(): Promise<AdminUser | null> {
+export const getAdminUser = cache(async (): Promise<AdminUser | null> => {
   const creds = adminCredentials();
   if (!creds) return null;
   const session = await getAuth().api.getSession({ headers: await headers() });
@@ -235,4 +236,4 @@ export async function getAdminUser(): Promise<AdminUser | null> {
   const binding = (await cookies()).get(BINDING_COOKIE)?.value;
   if (!binding || !(await safeEqual(binding, await bindingFor(creds, session.session.token)))) return null;
   return { id: ENV_ADMIN_ID, name: creds.name, email: creds.username, role: "owner", isActive: true };
-}
+});

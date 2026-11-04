@@ -9,7 +9,7 @@ import { SubmitButton } from "@/lib/admin/client";
 import { Badge, EmptyRow, PageHeader, Pagination, pageParam, param, Table } from "@/lib/admin/ui";
 import { decideUrl } from "./actions";
 
-export const metadata: Metadata = { title: "Legacy URLs" };
+export const metadata: Metadata = { title: "Old addresses" };
 
 const PAGE_SIZE = 40;
 const FILTERS = [
@@ -43,7 +43,7 @@ export default async function UrlsPage({ searchParams }: { searchParams: Promise
   return (
     <>
       <PageHeader icon="link"
-        title="Old website URLs"
+        title="Old addresses"
         description={`${n("same_path")} old addresses keep working at the same path. ${n("pending_decision")} (mostly theme-demo pages) wait for the client: send each to a page (301) or mark it gone (410). Nothing is redirected until it is decided here.`}
       />
       <div className="mb-4 flex flex-wrap items-center gap-2">

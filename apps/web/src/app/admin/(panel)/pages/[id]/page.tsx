@@ -1,3 +1,5 @@
+// The page editor: the page's details, then every section of the page as its own card with its own Save button.
+// Saving a section puts it on the website at once; the page's status decides whether the page itself is visible.
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { and, asc, eq, inArray, isNull } from "drizzle-orm";
@@ -6,30 +8,31 @@ import { schema } from "@gio/db";
 import { getDb } from "@/lib/db";
 import { encodePath } from "@/lib/content";
 import { hasRole, requireRole } from "@/lib/admin/guard";
-import { fmtDate } from "@/lib/admin/form";
 import { AdminIcon, type AdminIconName } from "@/lib/admin/icons";
 import { mediaPreviews } from "@/lib/admin/media-options";
-import { ConfirmButton, HtmlEditor, MediaPicker, SubmitButton } from "@/lib/admin/client";
-import { Badge, Card, Field, PageHeader, RadioCards, Toggle } from "@/lib/admin/ui";
-import { addItem, addSection, deleteItem, deleteSection, publishPage, saveItem, savePageMeta, saveSection } from "../actions";
+import { HtmlEditor } from "@/lib/admin/client";
+import { ItemCard } from "@/lib/admin/item-card";
+import { ActionButton, SectionForm } from "@/lib/admin/section-form";
+import { Badge, Card, CardBody, Field, LiveNote, PageHeader, RadioCards, SectionCard, Toggle } from "@/lib/admin/ui";
+import { addBlankItem, addSection, deleteSection, moveSectionBy, savePageMeta, saveSectionBundle } from "../actions";
 
 export const metadata = { title: "Edit page" };
 
 const TYPE_LABEL: Record<string, string> = {
-  hero_carousel: "Hero slider",
-  image_banner: "Image banner",
-  image: "Image",
+  hero_carousel: "Top slideshow",
+  image_banner: "Wide banner",
+  image: "Picture",
   rich_text: "Text",
   instagram_feed: "Instagram feed",
-  poster_slider: "Poster slider",
-  featured_video: "Featured video",
-  logo_carousel: "Logo carousel",
+  poster_slider: "Poster row",
+  featured_video: "Videos",
+  logo_carousel: "Logo row",
   embed: "Embedded page",
   map: "Map",
   contact_form: "Contact form",
   document_list: "Document list",
   cta: "Call to action",
-  latest_posts: "Latest posts",
+  latest_posts: "Latest news",
   upcoming_events: "Upcoming events",
 };
 const TYPE_HINT: Record<string, string> = {
@@ -66,8 +69,9 @@ const TYPE_ICON: Record<string, AdminIconName> = {
   latest_posts: "news",
   upcoming_events: "calendar",
 };
-/** Section types whose content lives in items (slides, images, logos). */
-const ITEM_TYPES = new Set(["hero_carousel", "image_banner", "image", "poster_slider", "logo_carousel", "cta"]);
+/** Section types whose content lives in items (slides, images, logos, videos). */
+const ITEM_TYPES = new Set(["hero_carousel", "image_banner", "image", "poster_slider", "logo_carousel", "featured_video", "cta"]);
+const ITEM_NOUN: Record<string, string> = { logo_carousel: "logo", featured_video: "video", cta: "button", poster_slider: "poster", hero_carousel: "slide", image_banner: "banner" };
 
 export default async function EditPage({ params }: PageProps<"/admin/pages/[id]">) {
   const { user } = await requireRole("contributor");
@@ -82,42 +86,25 @@ export default async function EditPage({ params }: PageProps<"/admin/pages/[id]"
   if (!page) notFound();
 
   const secs = await db.select().from(schema.sections).where(eq(schema.sections.pageId, pageId)).orderBy(asc(schema.sections.sort), asc(schema.sections.id));
-  const [items, [current]] = await Promise.all([
-    secs.length
-      ? db
-          .select()
-          .from(schema.sectionItems)
-          .where(
-            inArray(
-              schema.sectionItems.sectionId,
-              secs.map((s) => s.id),
-            ),
-          )
-          .orderBy(asc(schema.sectionItems.sort), asc(schema.sectionItems.id))
-      : Promise.resolve([]),
-    db
-      .select({ publishedAt: schema.publishedLayouts.publishedAt })
-      .from(schema.publishedLayouts)
-      .where(and(eq(schema.publishedLayouts.pageId, pageId), eq(schema.publishedLayouts.isCurrent, true)))
-      .limit(1),
-  ]);
-  const previews = await mediaPreviews(
-    db,
-    items.map((i) => i.mediaId),
-  );
-  const lastDraftChange = Math.max(0, ...secs.map((s) => s.updatedAt.getTime()), ...items.map((i) => i.updatedAt.getTime()));
-  const unpublished = !current || lastDraftChange > current.publishedAt.getTime();
+  const items = secs.length
+    ? await db
+        .select()
+        .from(schema.sectionItems)
+        .where(inArray(schema.sectionItems.sectionId, secs.map((s) => s.id)))
+        .orderBy(asc(schema.sectionItems.sort), asc(schema.sectionItems.id))
+    : [];
+  const previews = await mediaPreviews(db, items.map((i) => i.mediaId));
   const canEdit = hasRole(user, "editor");
   const canDelete = hasRole(user, "admin");
   const isHome = page.slug === "";
   const publicUrl = isHome ? "/" : `/${encodePath(page.slug)}/`;
+  const onSite = page.status === "published";
 
   return (
     <>
       <PageHeader
-        icon="pages"
-        back={{ href: "/admin/pages/", label: "All pages" }}
-        title={isHome ? "Home page" : page.title}
+        back={isHome ? { href: "/admin/homepage/", label: "Home page" } : { href: "/admin/pages/", label: "All pages" }}
+        title={isHome ? "Home page: all sections" : page.title}
         description={
           <>
             {isHome ? "/" : `/${page.slug}/`} · {page.template === "sections" ? "built from sections" : `template: ${page.template}`}
@@ -126,83 +113,79 @@ export default async function EditPage({ params }: PageProps<"/admin/pages/[id]"
         actions={
           <>
             {secs.length ? (
-              <a href={`/admin/preview/page/${pageId}/`} target="_blank" className="btn btn-ghost">
-                Preview draft <AdminIcon name="external" className="h-4 w-4" />
+              <a href={`/admin/preview/page/${pageId}/`} target="_blank" className="btn btn-ghost min-h-11">
+                Preview <AdminIcon name="external" className="h-4 w-4" />
               </a>
             ) : null}
-            <a href={publicUrl} target="_blank" className="btn btn-ghost">
+            <a href={publicUrl} target="_blank" className="btn btn-ghost min-h-11">
               View on website <AdminIcon name="external" className="h-4 w-4" />
             </a>
-            {canEdit && secs.length ? (
-              <form action={publishPage.bind(null, pageId)}>
-                <SubmitButton>Publish sections</SubmitButton>
-              </form>
-            ) : null}
           </>
         }
       />
 
-      {secs.length ? (
-        <div className={`mb-6 flex items-start gap-3 rounded-xl px-4 py-3 text-sm ring-1 ${unpublished ? "bg-amber-50 text-amber-900 ring-amber-200" : "bg-emerald-50 text-emerald-900 ring-emerald-200"}`}>
-          <AdminIcon name={unpublished ? "draft" : "check"} className="mt-0.5 h-5 w-5 shrink-0" />
+      {onSite ? (
+        <LiveNote viewHref={publicUrl}>
+          Each section below has its own <strong>Save</strong> button. When you save, the change is on the website straight away.
+        </LiveNote>
+      ) : (
+        <div className="mb-6 flex items-start gap-3 rounded-2xl bg-amber-50 px-4 py-3 text-sm text-amber-950 ring-1 ring-amber-200">
+          <AdminIcon name="draft" className="mt-0.5 h-5 w-5 shrink-0" />
           <p>
-            {current
-              ? unpublished
-                ? `The draft has changes made after the last publish (${fmtDate(current.publishedAt, true)}). Click “Publish sections” to put them on the website.`
-                : `The website shows the latest draft (published ${fmtDate(current.publishedAt, true)}).`
-              : "These sections have never been published. The website shows nothing for them until you publish."}
+            This page is not on the website yet: its status is <strong>{page.status}</strong>. You can edit its sections now. To show the page, set the status to <strong>Published</strong> and save the page details.
           </p>
         </div>
+      )}
+      {isHome ? (
+        <p className="mb-6 text-sm text-muted">
+          This lists every section of the home page. The pages under <strong>Home page</strong> in the menu on the left are the easier way to edit banners, posters, videos and the rest.
+        </p>
       ) : null}
 
-      <Card title="Page details" className="mb-8">
-        <form action={savePageMeta.bind(null, pageId)} className="grid gap-4 md:grid-cols-2">
-          <Field label="Page title">
-            <input name="title" required defaultValue={page.title} className="field" disabled={!canEdit} />
-          </Field>
-          <Field label="Web address" hint={isHome ? "The home page is always /." : "Changing it breaks links to the old address."}>
-            <input name="slug" defaultValue={page.slug} className="field font-mono text-sm" disabled={!canEdit || isHome} required={!isHome} />
-          </Field>
-          <div className="md:col-span-2">
-            <span className="label">Status</span>
-            <RadioCards
-              name="status"
-              defaultValue={page.status}
-              disabled={!canEdit}
-              className="sm:grid-cols-2 xl:grid-cols-4"
-              options={PAGE_STATUSES.map((st) => ({
-                value: st,
-                label: st[0].toUpperCase() + st.slice(1),
-                hint: { draft: "Not on the website", published: "Visible on the website", private: "Only people who sign in", archived: "Hidden, kept for the record" }[st],
-              }))}
-            />
-          </div>
-          <details className="group md:col-span-2">
-            <summary className="flex cursor-pointer list-none items-center gap-2 text-sm font-semibold text-brand-700">
-              <AdminIcon name="chevron" className="h-4 w-4 transition-transform group-open:rotate-90" /> Search engine details (optional)
-            </summary>
-            <div className="mt-3 grid gap-4">
-              <Field label="Search title">
-                <input name="seoTitle" defaultValue={page.seoTitle ?? ""} className="field" disabled={!canEdit} />
-              </Field>
-              <Field label="Search description">
-                <textarea name="seoDescription" rows={2} defaultValue={page.seoDescription ?? ""} className="field" disabled={!canEdit} />
-              </Field>
-            </div>
-          </details>
-          {canEdit ? (
+      <SectionCard icon="pages" title="Page details" subtitle="Title, web address, status and search engine text.">
+        <SectionForm action={savePageMeta.bind(null, pageId)} readOnly={!canEdit} saveLabel="Save details">
+          <CardBody className="grid gap-4 md:grid-cols-2">
+            <Field label="Page title">
+              <input name="title" required defaultValue={page.title} className="field" />
+            </Field>
+            <Field label="Web address" hint={isHome ? "The home page is always /." : "Changing it breaks links to the old address."}>
+              <input name="slug" defaultValue={page.slug} className="field font-mono text-sm" disabled={isHome} required={!isHome} />
+            </Field>
             <div className="md:col-span-2">
-              <SubmitButton>Save details</SubmitButton>
+              <span className="label">Status</span>
+              <RadioCards
+                name="status"
+                defaultValue={page.status}
+                className="sm:grid-cols-2 xl:grid-cols-3"
+                // Draft or Published. A page that is already private or archived keeps that as an extra choice, so saving never changes it by accident.
+                options={PAGE_STATUSES.filter((st) => st === "draft" || st === "published" || st === page.status).map((st) => ({
+                  value: st,
+                  label: st[0].toUpperCase() + st.slice(1),
+                  hint: { draft: "Not on the website", published: "Visible on the website", private: "Only people who sign in", archived: "Hidden, kept for the record" }[st],
+                }))}
+              />
             </div>
-          ) : null}
-        </form>
-      </Card>
+            <details className="group md:col-span-2">
+              <summary className="flex min-h-11 cursor-pointer list-none items-center gap-2 text-sm font-semibold text-brand-700">
+                <AdminIcon name="chevron" className="h-4 w-4 transition-transform group-open:rotate-90" /> Search engine details (optional)
+              </summary>
+              <div className="mt-3 grid gap-4">
+                <Field label="Search title">
+                  <input name="seoTitle" defaultValue={page.seoTitle ?? ""} className="field" />
+                </Field>
+                <Field label="Search description">
+                  <textarea name="seoDescription" rows={2} defaultValue={page.seoDescription ?? ""} className="field" />
+                </Field>
+              </div>
+            </details>
+          </CardBody>
+        </SectionForm>
+      </SectionCard>
 
       {page.template !== "sections" && !secs.length ? (
-        <Card className="mb-6">
+        <Card className="mt-6">
           <p className="text-sm text-muted">
-            This page is built from {page.template === "leaders" ? "the leaders list" : page.template === "post_listing" ? "posts in its category" : "its template"}, not from
-            sections. Edit that content in{" "}
+            This page is built from {page.template === "leaders" ? "the leaders list" : page.template === "post_listing" ? "posts in its category" : "its template"}, not from sections. Edit that content in{" "}
             <Link href={page.template === "leaders" ? "/admin/leaders/" : "/admin/posts/"} className="font-semibold text-brand-700 underline">
               {page.template === "leaders" ? "Leaders" : "News"}
             </Link>
@@ -211,152 +194,129 @@ export default async function EditPage({ params }: PageProps<"/admin/pages/[id]"
         </Card>
       ) : null}
 
-      {secs.length ? <h2 className="mb-3 text-xs font-semibold uppercase tracking-[0.14em] text-muted">Sections on this page ({secs.length})</h2> : null}
-      <div className="space-y-6">
-        {secs.map((s) => {
+      {secs.length ? <h2 className="mb-3 mt-10 text-xs font-semibold uppercase tracking-[0.14em] text-muted">Sections on this page, top to bottom ({secs.length})</h2> : null}
+      <div className="space-y-8">
+        {secs.map((s, n) => {
           const data = JSON.parse(s.dataJson) as Record<string, unknown>;
-          const secItems = items.filter((i) => i.sectionId === s.id);
+          const own = items.filter((i) => i.sectionId === s.id);
+          const noun = ITEM_NOUN[s.type] ?? "picture";
           return (
-            <section key={s.id} id={`section-${s.id}`} className="scroll-mt-20 overflow-hidden rounded-2xl border border-line bg-white shadow-sm">
-              <header className="flex flex-wrap items-center justify-between gap-3 border-b border-line bg-paper/60 px-5 py-3">
-                <div className="flex min-w-0 items-center gap-3">
-                  <span className="grid h-9 w-9 shrink-0 place-items-center rounded-lg bg-brand-50 text-brand-600 ring-1 ring-inset ring-brand-100">
-                    <AdminIcon name={TYPE_ICON[s.type] ?? "pages"} className="h-[18px] w-[18px]" />
+            <SectionCard
+              key={s.id}
+              id={`section-${s.id}`}
+              icon={TYPE_ICON[s.type] ?? "pages"}
+              title={`${TYPE_LABEL[s.type] ?? s.type}${s.title ? `: ${s.title}` : ""}`}
+              subtitle={`Section ${n + 1} of ${secs.length} · ${TYPE_HINT[s.type] ?? ""}`}
+              status={
+                <span className="flex gap-1.5">
+                  <Badge value={s.isVisible ? "published" : "hidden"} label={s.isVisible ? "On the website" : "Hidden"} />
+                  {s.reviewState === "pending_client" ? <Badge value="pending_client" label="needs review" /> : null}
+                </span>
+              }
+              actions={
+                canEdit ? (
+                  <span className="flex gap-1.5">
+                    <ActionButton action={moveSectionBy.bind(null, pageId, s.id, -1)} disabled={n === 0} label={`Move section ${n + 1} up`} className="btn btn-ghost btn-sm min-h-10 px-3">
+                      ↑ Up
+                    </ActionButton>
+                    <ActionButton action={moveSectionBy.bind(null, pageId, s.id, 1)} disabled={n === secs.length - 1} label={`Move section ${n + 1} down`} className="btn btn-ghost btn-sm min-h-10 px-3">
+                      ↓ Down
+                    </ActionButton>
                   </span>
-                  <div className="min-w-0">
-                    <div className="flex flex-wrap items-center gap-2">
-                      <span className="font-semibold text-brand-900">{TYPE_LABEL[s.type] ?? s.type}</span>
-                      {s.title ? <span className="truncate text-sm text-muted">· {s.title}</span> : null}
-                      {!s.isVisible ? <Badge value="hidden" /> : null}
-                      {s.reviewState === "pending_client" ? <Badge value="pending_client" label="needs review" /> : null}
-                    </div>
-                    <p className="text-xs text-muted">{TYPE_HINT[s.type] ?? ""}</p>
-                  </div>
-                </div>
-                <span className="rounded-full bg-white px-2.5 py-0.5 text-xs tabular-nums text-muted ring-1 ring-line">Position {s.sort}</span>
-              </header>
-
-              <form action={saveSection.bind(null, pageId, s.id)} className="grid gap-4 p-5 md:grid-cols-[1fr_8rem_auto] md:items-end">
-                <Field label="Heading (optional)">
-                  <input name="title" defaultValue={s.title ?? ""} className="field" disabled={!canEdit} />
-                </Field>
-                <Field label="Position" hint="Lower comes first">
-                  <input name="sort" type="number" defaultValue={s.sort} className="field" disabled={!canEdit} />
-                </Field>
-                <div className="pb-2">
-                  <Toggle name="isVisible" label="Visible" defaultChecked={s.isVisible} disabled={!canEdit} />
-                </div>
-                {s.type === "rich_text" ? (
-                  <div className="md:col-span-3">
-                    <span className="label">Text</span>
-                    <HtmlEditor name="html" rows={10} defaultValue={String(data.html ?? "")} disabled={!canEdit} />
-                    <span className="mt-1 block text-xs text-muted">Select text and use the buttons above to format it. Malayalam is fine.</span>
-                  </div>
-                ) : (
-                  <details className="group md:col-span-3">
-                    <summary className="flex cursor-pointer list-none items-center gap-2 text-sm font-semibold text-brand-700">
-                      <AdminIcon name="chevron" className="h-4 w-4 transition-transform group-open:rotate-90" /> Advanced settings
-                    </summary>
-                    <Field label="Settings (JSON)" className="mt-3" hint="For example autoplay, interval, video id or embed address.">
-                      <textarea name="dataJson" rows={Math.min(8, Math.max(2, JSON.stringify(data, null, 2).split("\n").length))} defaultValue={JSON.stringify(data, null, 2)} className="field font-mono text-xs" disabled={!canEdit} />
+                ) : null
+              }
+            >
+              <SectionForm
+                action={saveSectionBundle.bind(null, pageId, s.id)}
+                readOnly={!canEdit}
+                aside={
+                  canDelete ? (
+                    <ActionButton action={deleteSection.bind(null, pageId, s.id)} confirm="Delete this section and everything in it? It leaves the website." className="btn btn-danger min-h-11">
+                      <AdminIcon name="trash" className="h-4 w-4" /> Delete section
+                    </ActionButton>
+                  ) : null
+                }
+              >
+                <CardBody>
+                  <input type="hidden" name="itemIds" value={own.map((i) => i.id).join(",")} />
+                  <div className="grid items-end gap-4 sm:grid-cols-[1fr_auto]">
+                    <Field label="Heading (optional)">
+                      <input name="title" defaultValue={s.title ?? ""} className="field" />
                     </Field>
-                  </details>
-                )}
-                {canEdit ? (
-                  <div className="flex flex-wrap items-center justify-between gap-2 border-t border-line pt-4 md:col-span-3">
-                    <SubmitButton>Save section</SubmitButton>
-                    {canDelete ? (
-                      <ConfirmButton formAction={deleteSection.bind(null, pageId, s.id)} message="Delete this section and all its items from the draft?">
-                        <AdminIcon name="trash" className="h-4 w-4" /> Delete section
-                      </ConfirmButton>
-                    ) : null}
+                    <div className="pb-2">
+                      <Toggle name="isVisible" label="Show on the website" defaultChecked={s.isVisible} />
+                    </div>
                   </div>
-                ) : null}
-              </form>
+                  {s.type === "rich_text" ? (
+                    <div>
+                      <span className="label">Text</span>
+                      <HtmlEditor name="html" rows={10} defaultValue={String(data.html ?? "")} />
+                      <span className="mt-1 block text-xs text-muted">Select text and use the buttons above to format it. Malayalam is fine.</span>
+                    </div>
+                  ) : (
+                    <details className="group">
+                      <summary className="flex min-h-11 cursor-pointer list-none items-center gap-2 text-sm font-semibold text-brand-700">
+                        <AdminIcon name="chevron" className="h-4 w-4 transition-transform group-open:rotate-90" /> Advanced settings (for the web team)
+                      </summary>
+                      <Field label="Settings (JSON)" className="mt-2" hint="For example autoplay, interval, video id or embed address. Leave this alone unless you were asked to change it.">
+                        <textarea name="dataJson" rows={Math.min(8, Math.max(2, JSON.stringify(data, null, 2).split("\n").length))} defaultValue={JSON.stringify(data, null, 2)} className="field font-mono text-xs" />
+                      </Field>
+                    </details>
+                  )}
 
-              {secItems.length || ITEM_TYPES.has(s.type) ? (
-                <div className="border-t border-line bg-paper/50 p-5">
-                  <h3 className="mb-3 text-sm font-semibold text-ink">
-                    {s.type === "logo_carousel" ? "Logos" : s.type === "cta" ? "Buttons" : "Slides and pictures"} ({secItems.length})
-                  </h3>
-                  <div className="space-y-3">
-                    {secItems.map((it) => (
-                      <form key={it.id} action={saveItem.bind(null, pageId, it.id)} className={`grid gap-4 rounded-xl border bg-white p-4 md:grid-cols-[13rem_1fr_1fr] ${it.isVisible ? "border-line" : "border-dashed border-slate-300 opacity-80"}`}>
-                        <MediaPicker name="mediaId" defaultId={it.mediaId} preview={it.mediaId ? previews.get(it.mediaId) : null} />
-                        <div className="space-y-3">
-                          <Field label="Heading">
-                            <input name="heading" defaultValue={it.heading ?? ""} className="field" />
-                          </Field>
-                          <Field label="Text">
-                            <textarea name="body" rows={2} defaultValue={it.body ?? ""} className="field" />
-                          </Field>
-                          <Field label="Picture description" hint="Read aloud for people who cannot see the picture.">
-                            <input name="altText" defaultValue={it.altText ?? ""} className="field" />
-                          </Field>
+                  {ITEM_TYPES.has(s.type) ? (
+                    <div className="space-y-4 border-t border-line pt-5">
+                      <h3 className="text-sm font-semibold text-ink">
+                        {noun[0].toUpperCase() + noun.slice(1)}s in this section ({own.length})
+                      </h3>
+                      {own.length ? (
+                        <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-3">
+                          {own.map((it, k) => (
+                            <ItemCard
+                              key={it.id}
+                              pageId={pageId}
+                              type={s.type}
+                              item={it}
+                              index={k}
+                              count={own.length}
+                              preview={it.mediaId ? previews.get(it.mediaId) : null}
+                              noun={noun}
+                              folder={s.type === "logo_carousel" ? "logos" : "images"}
+                              aspect={s.type === "logo_carousel" ? "aspect-[2/1]" : s.type === "featured_video" ? "aspect-video" : "aspect-[16/9]"}
+                              fit={s.type === "logo_carousel" ? "contain" : "cover"}
+                              canDelete={canDelete}
+                              full
+                            />
+                          ))}
                         </div>
-                        <div className="space-y-3">
-                          <Field label="Link">
-                            <input name="linkUrl" defaultValue={it.linkUrl ?? ""} className="field" placeholder="/about-us/ or https://…" />
-                          </Field>
-                          <Field label="Link text">
-                            <input name="linkLabel" defaultValue={it.linkLabel ?? ""} className="field" />
-                          </Field>
-                          <div className="grid grid-cols-[5rem_1fr] items-end gap-3">
-                            <Field label="Position">
-                              <input name="sort" type="number" defaultValue={it.sort} className="field" />
-                            </Field>
-                            <div className="space-y-2 pb-1">
-                              <Toggle name="isVisible" label="Visible" defaultChecked={it.isVisible} />
-                              <Toggle name="openInNewTab" label="Open link in a new tab" defaultChecked={it.openInNewTab} />
-                            </div>
-                          </div>
-                          {canEdit ? (
-                            <div className="flex gap-2 pt-1">
-                              <SubmitButton className="btn btn-primary btn-sm">Save</SubmitButton>
-                              {canDelete ? (
-                                <ConfirmButton className="btn btn-danger btn-sm" formAction={deleteItem.bind(null, pageId, it.id)} message="Delete this item from the draft?">
-                                  <AdminIcon name="trash" className="h-3.5 w-3.5" /> Delete
-                                </ConfirmButton>
-                              ) : null}
-                            </div>
-                          ) : null}
-                        </div>
-                      </form>
-                    ))}
-                  </div>
-                  {canEdit ? (
-                    <form action={addItem.bind(null, pageId, s.id)} className="mt-3">
-                      <SubmitButton className="btn btn-ghost">
-                        <AdminIcon name="plus" className="h-4 w-4" /> Add {s.type === "logo_carousel" ? "logo" : s.type === "cta" ? "button" : "picture"}
-                      </SubmitButton>
-                    </form>
+                      ) : (
+                        <p className="rounded-xl border border-dashed border-slate-300 px-4 py-6 text-center text-sm text-muted">Nothing here yet.</p>
+                      )}
+                      {canEdit ? (
+                        <ActionButton action={addBlankItem.bind(null, pageId, s.id)} className="btn btn-ghost min-h-11">
+                          <AdminIcon name="plus" className="h-4 w-4" /> Add a {noun}
+                        </ActionButton>
+                      ) : null}
+                    </div>
                   ) : null}
-                </div>
-              ) : null}
-            </section>
+                </CardBody>
+              </SectionForm>
+            </SectionCard>
           );
         })}
       </div>
 
       {canEdit && (page.template === "sections" || secs.length) ? (
-        <Card title="Add a section" description="Pick what the new block should show. It is added at the end of the draft." className="mt-8">
-          <form action={addSection.bind(null, pageId)} className="space-y-5">
-            <RadioCards
-              name="type"
-              defaultValue="rich_text"
-              className="sm:grid-cols-2 xl:grid-cols-3"
-              options={SECTION_TYPES.map((t) => ({ value: t, label: TYPE_LABEL[t] ?? t, hint: TYPE_HINT[t] }))}
-            />
-            <div className="flex flex-wrap items-end gap-3">
-              <Field label="Heading (optional)" className="min-w-64 flex-1">
+        <SectionCard icon="plus" title="Add a section" subtitle="Pick what the new block should show. It is added at the bottom and stays hidden until you switch it on." id="add-section">
+          <SectionForm action={addSection.bind(null, pageId)} saveLabel="Add the section" refreshOnSave resetOnSave sticky={false}>
+            <CardBody>
+              <RadioCards name="type" defaultValue="rich_text" className="sm:grid-cols-2 xl:grid-cols-3" options={SECTION_TYPES.map((t) => ({ value: t, label: TYPE_LABEL[t] ?? t, hint: TYPE_HINT[t] }))} />
+              <Field label="Heading (optional)" className="max-w-md">
                 <input name="title" className="field" />
               </Field>
-              <SubmitButton>
-                <AdminIcon name="plus" className="h-4 w-4" /> Add section
-              </SubmitButton>
-            </div>
-          </form>
-        </Card>
+            </CardBody>
+          </SectionForm>
+        </SectionCard>
       ) : null}
     </>
   );

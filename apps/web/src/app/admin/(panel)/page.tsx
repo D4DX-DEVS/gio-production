@@ -1,17 +1,17 @@
-// "Today": what needs you, what is ready to go live, and the shortest way to start the common jobs.
+// Dashboard: what needs you and the shortest way to start the common jobs.
 import Link from "next/link";
 import type { ReactNode } from "react";
-import { and, count, desc, eq, inArray, isNull, or, sql } from "drizzle-orm";
+import { desc, isNull, sql } from "drizzle-orm";
 import { galleryCount, homepageCounts } from "@/lib/admin/stats";
 import { schema } from "@gio/db";
 import { getDb } from "@/lib/db";
 import { hasRole, requireRole } from "@/lib/admin/guard";
 import { fmtDate } from "@/lib/admin/form";
-import { homepageDraft } from "@/lib/admin/homepage";
+import { fixedPageIds } from "@/lib/admin/nav-data";
 import { AdminIcon, type AdminIconName } from "@/lib/admin/icons";
 import { Badge } from "@/lib/admin/ui";
 
-export const metadata = { title: "Today" };
+export const metadata = { title: "Dashboard" };
 
 const ACTION_DOT: Record<string, string> = {
   create: "bg-brand-500 ring-brand-100",
@@ -53,29 +53,22 @@ export default async function Dashboard() {
   const isAdmin = hasRole(user, "admin");
   const db = getDb();
   const s = schema;
-  const n = async (q: Promise<{ n: number }[]>) => (await q)[0]?.n ?? 0;
 
-  const [posts, drafts, untitled, events, upcoming, leaders, documents, pendingReview, newMessages, noAlt, oldUrls, fixedPages, recentPosts, recentEvents, activity] = await Promise.all([
-    n(db.select({ n: count() }).from(s.posts).where(and(eq(s.posts.status, "published"), isNull(s.posts.deletedAt)))),
-    n(db.select({ n: count() }).from(s.posts).where(and(eq(s.posts.status, "draft"), isNull(s.posts.deletedAt)))),
-    n(db.select({ n: count() }).from(s.posts).where(and(eq(s.posts.status, "published"), isNull(s.posts.deletedAt), or(isNull(s.posts.title), eq(s.posts.title, ""))))),
-    n(db.select({ n: count() }).from(s.events).where(isNull(s.events.deletedAt))),
-    n(
-      db
-        .select({ n: count() })
-        .from(s.events)
-        .where(and(inArray(s.events.status, ["published", "scheduled"]), isNull(s.events.deletedAt), sql`coalesce(${s.events.endsAt}, ${s.events.startsAt}) >= ${Date.now()}`)),
-    ),
-    n(db.select({ n: count() }).from(s.leaders)),
-    n(db.select({ n: count() }).from(s.documents)),
-    n(db.select({ n: count() }).from(s.reviewItems).where(eq(s.reviewItems.status, "pending"))),
-    n(db.select({ n: count() }).from(s.contactSubmissions).where(eq(s.contactSubmissions.status, "new"))),
-    n(db.select({ n: count() }).from(s.media).where(and(eq(s.media.kind, "image"), isNull(s.media.altText), isNull(s.media.deletedAt), isNull(s.media.variantOfMediaId)))),
-    isAdmin ? n(db.select({ n: count() }).from(s.legacyUrls).where(eq(s.legacyUrls.action, "pending_decision"))) : Promise.resolve(0),
-    db
-      .select({ id: s.pages.id, slug: s.pages.slug })
-      .from(s.pages)
-      .where(and(inArray(s.pages.slug, ["", "about-us", "contact-us"]), isNull(s.pages.deletedAt))),
+  // One round trip for all the counts (eleven separate queries made this the slowest screen), in parallel with the rest.
+  const [[c], fixedPages, recentPosts, recentEvents, activity, home, gallery] = await Promise.all([
+    db.all<Record<"posts" | "drafts" | "untitled" | "events" | "upcoming" | "leaders" | "documents" | "pendingReview" | "newMessages" | "noAlt" | "oldUrls", number>>(sql`select
+      (select count(*) from ${s.posts} where ${s.posts.status} = 'published' and ${s.posts.deletedAt} is null) as posts,
+      (select count(*) from ${s.posts} where ${s.posts.status} = 'draft' and ${s.posts.deletedAt} is null) as drafts,
+      (select count(*) from ${s.posts} where ${s.posts.status} = 'published' and ${s.posts.deletedAt} is null and (${s.posts.title} is null or ${s.posts.title} = '')) as untitled,
+      (select count(*) from ${s.events} where ${s.events.deletedAt} is null) as events,
+      (select count(*) from ${s.events} where ${s.events.status} in ('published', 'scheduled') and ${s.events.deletedAt} is null and coalesce(${s.events.endsAt}, ${s.events.startsAt}) >= ${Date.now()}) as upcoming,
+      (select count(*) from ${s.leaders}) as leaders,
+      (select count(*) from ${s.documents}) as documents,
+      (select count(*) from ${s.reviewItems} where ${s.reviewItems.status} = 'pending') as pendingReview,
+      (select count(*) from ${s.contactSubmissions} where ${s.contactSubmissions.status} = 'new') as newMessages,
+      (select count(*) from ${s.media} where ${s.media.kind} = 'image' and ${s.media.altText} is null and ${s.media.deletedAt} is null and ${s.media.variantOfMediaId} is null) as noAlt,
+      ${isAdmin ? sql`(select count(*) from ${s.legacyUrls} where ${s.legacyUrls.action} = 'pending_decision')` : sql`0`} as oldUrls`),
+    fixedPageIds(),
     db
       .select({ id: s.posts.id, title: s.posts.title, status: s.posts.status, updatedAt: s.posts.updatedAt })
       .from(s.posts)
@@ -89,10 +82,11 @@ export default async function Dashboard() {
       .orderBy(desc(s.events.updatedAt))
       .limit(6),
     db.select().from(s.auditLog).orderBy(desc(s.auditLog.createdAt)).limit(8),
+    homepageCounts(db),
+    galleryCount(db),
   ]);
-  const [home, gallery, homeDraft] = await Promise.all([homepageCounts(db), galleryCount(db), homepageDraft(db).catch(() => null)]);
-  const pageId = new Map(fixedPages.map((p) => [p.slug, p.id]));
-  const pageHref = (slug: string) => (pageId.has(slug) ? `/admin/pages/${pageId.get(slug)}/` : "/admin/pages/");
+  const { posts, drafts, untitled, events, upcoming, leaders, documents, pendingReview, newMessages, noAlt, oldUrls } = Object.fromEntries(Object.entries(c ?? {}).map(([k, v]) => [k, Number(v) || 0])) as Record<keyof NonNullable<typeof c>, number>;
+  const pageHref = (slug: string) => (fixedPages.has(slug) ? `/admin/pages/${fixedPages.get(slug)}/` : "/admin/pages/");
 
   const recent = [
     ...recentPosts.map((p) => ({ key: `p${p.id}`, kind: "News", title: p.title, status: p.status, updatedAt: p.updatedAt, href: `/admin/posts/${p.id}/` })),
@@ -148,14 +142,8 @@ export default async function Dashboard() {
           {greeting()}, {user.name}.
         </h1>
         <p className="max-w-[60ch] text-lg text-muted">
-          {pendingReview || newMessages || homeDraft?.unpublished
-            ? [
-                homeDraft?.unpublished ? "The home page has changes that are not live yet" : null,
-                pendingReview ? `${plural(pendingReview, "question")} still waiting on the client` : null,
-                newMessages ? plural(newMessages, "new message") : null,
-              ]
-                .filter(Boolean)
-                .join(", ") + "."
+          {pendingReview || newMessages
+            ? [pendingReview ? `${plural(pendingReview, "question")} still waiting on the client` : null, newMessages ? plural(newMessages, "new message") : null].filter(Boolean).join(", ") + "."
             : "Nothing is waiting on you. Pick a job below to get started."}
         </p>
       </section>
@@ -206,35 +194,20 @@ export default async function Dashboard() {
             )}
           </Panel>
 
-          <Panel
-            title="Ready to go live"
-            aside={
-              homeDraft?.unpublished && isEditor ? (
-                <Link href="/admin/homepage/" className="inline-flex h-11 items-center rounded-full bg-brand-600 px-5 text-sm font-bold text-white transition-colors hover:bg-brand-700">
-                  Review and publish
-                </Link>
-              ) : null
-            }
-          >
-            <div className="px-4 pb-4">
-              {homeDraft ? (
-                <p className="mb-3 text-muted">
-                  {homeDraft.current ? `Visitors see the version published on ${fmtDate(homeDraft.current.publishedAt, true)}.` : "The home page has never been published, so visitors see nothing for it yet."}
-                </p>
-              ) : null}
-              <ol className="flex flex-col">
-                {homeDraft?.unpublished ? (
-                  <li className="flex items-baseline gap-3.5 border-t border-line py-3">
-                    <span className="w-28 shrink-0 font-mono text-xs uppercase tracking-wide text-muted">Home page</span>
-                    <span className="flex-1">Edited and not published yet</span>
+          <Panel title="Your changes go live at once">
+            <div className="flex items-start gap-3.5 px-4 pb-4 pt-1">
+              <span aria-hidden className="mt-1.5 h-2.5 w-2.5 shrink-0 rounded-full bg-emerald-600" />
+              <p className="text-muted">
+                Every section has its own <strong className="text-ink">Save</strong> button. When you save, visitors see the change straight away. There is no Publish step for the home page or other pages.
+                {isEditor ? (
+                  <>
+                    {" "}
                     <Link href="/admin/homepage/" className="font-semibold text-brand-700">
-                      Open →
+                      Edit the home page →
                     </Link>
-                  </li>
-                ) : (
-                  <li className="border-t border-line py-3 text-muted">Nothing is waiting. Everything you edited is live.</li>
-                )}
-              </ol>
+                  </>
+                ) : null}
+              </p>
             </div>
           </Panel>
 

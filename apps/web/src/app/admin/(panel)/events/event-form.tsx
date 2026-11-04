@@ -15,7 +15,6 @@ const STATUS_OPTIONS = [
   { value: "draft", label: "Draft", hint: "Saved, not on the website" },
   { value: "published", label: "Published", hint: "Visible on the Events page" },
   { value: "cancelled", label: "Cancelled", hint: "Shown as cancelled" },
-  { value: "archived", label: "Archived", hint: "Hidden, kept for the record" },
 ];
 
 export async function EventForm({ event, canDelete }: { event?: Event; canDelete?: boolean }) {
@@ -106,7 +105,12 @@ export async function EventForm({ event, canDelete }: { event?: Event; canDelete
 
         <div className="space-y-6">
           <Card title="Status">
-            <RadioCards name="status" defaultValue={event?.status ?? "draft"} options={STATUS_OPTIONS} />
+            <RadioCards
+              name="status"
+              defaultValue={event?.status ?? "draft"}
+              // An event that is already scheduled or archived keeps that as an extra choice, so saving never changes it by accident.
+              options={event && !STATUS_OPTIONS.some((o) => o.value === event.status) ? [...STATUS_OPTIONS, { value: event.status, label: event.status[0].toUpperCase() + event.status.slice(1), hint: "Its current status" }] : STATUS_OPTIONS}
+            />
           </Card>
           <Card title="Photo">
             <MediaPicker name="featuredMediaId" label="Shown on the event page and in the gallery" defaultId={event?.featuredMediaId} preview={event?.featuredMediaId ? previews.get(event.featuredMediaId) : undefined} />

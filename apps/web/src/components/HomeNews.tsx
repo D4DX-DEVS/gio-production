@@ -13,16 +13,24 @@ function Pill({ post }: { post: PostCard }) {
   return <span className="absolute left-3 top-3 z-10 rounded-full bg-white/95 px-3 py-1 text-xs font-semibold text-brand-800 shadow-sm transition duration-300 group-hover:-translate-y-0.5 group-hover:bg-accent-600 group-hover:text-white">{name}</span>;
 }
 
+/** Picture frame: the whole picture is shown, never cropped, over a blurred copy of itself that fills any gaps. */
+function Thumb({ post, className }: { post: PostCard; className: string }) {
+  return (
+    <div className={`lit lit-card relative overflow-hidden bg-brand-50 ${post.image ? "skeleton" : ""} ${className}`}>
+      {post.image && <Img media={post.image} alt="" className="absolute inset-0 h-full w-full scale-125 object-cover opacity-70 blur-2xl" />}
+      <Img media={post.image} alt="" className="reveal-img absolute inset-0 h-full w-full object-contain" fallbackLabel="No image published for this post" />
+      <Pill post={post} />
+    </div>
+  );
+}
+
 /** The newest story: a big picture, then date, headline, a few lines and "Read More". */
 function LeadCard({ post }: { post: PostCard }) {
   const title = post.title || "Untitled post";
   const excerpt = stripHtml(post.excerpt, 200);
   return (
     <article className="card-lift group relative flex h-full flex-col overflow-hidden rounded-2xl border border-line bg-white shadow-card hover:border-brand-200">
-      <div className={`lit relative aspect-[4/3] overflow-hidden bg-brand-50 sm:aspect-[16/9] lg:aspect-auto lg:min-h-[20rem] lg:flex-1 ${post.image ? "skeleton" : ""}`}>
-        <Img media={post.image} alt="" className="zoom-media reveal-img h-full w-full object-cover lg:absolute lg:inset-0" fallbackLabel="No image published for this post" />
-        <Pill post={post} />
-      </div>
+      <Thumb post={post} className="aspect-[4/3] sm:aspect-[16/9] lg:aspect-auto lg:min-h-[20rem] lg:flex-1" />
       <div className="flex shrink-0 flex-col p-5 lg:p-6">
         {post.publishedAt && (
           <time dateTime={post.publishedAt.toISOString()} className="text-xs font-semibold uppercase tracking-wider text-muted">
@@ -52,10 +60,7 @@ function SmallCard({ post }: { post: PostCard }) {
   const title = post.title || "Untitled post";
   return (
     <article className="card-lift group relative flex h-full flex-col overflow-hidden rounded-2xl border border-line bg-white shadow-card hover:border-brand-200">
-      <div className={`lit relative aspect-[16/10] overflow-hidden bg-brand-50 ${post.image ? "skeleton" : ""}`}>
-        <Img media={post.image} alt="" className="zoom-media reveal-img h-full w-full object-cover" fallbackLabel="No image published for this post" />
-        <Pill post={post} />
-      </div>
+      <Thumb post={post} className="aspect-[16/10]" />
       <div className="flex flex-1 flex-col p-3.5 sm:p-4">
         {post.publishedAt && (
           <time dateTime={post.publishedAt.toISOString()} className="text-xs font-medium text-muted">

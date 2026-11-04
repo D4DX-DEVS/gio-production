@@ -9,7 +9,7 @@ import { contains } from "@/lib/admin/sql";
 import { FileInput } from "@/lib/admin/client";
 import { Badge, Card, Field, PageHeader, Pagination, pageParam, param } from "@/lib/admin/ui";
 
-export const metadata: Metadata = { title: "Media library" };
+export const metadata: Metadata = { title: "All files" };
 
 const PAGE_SIZE = 48;
 const FILTERS = [
@@ -73,7 +73,7 @@ export default async function MediaPage({ searchParams }: { searchParams: Promis
 
   return (
     <>
-      <PageHeader icon="image" title="Media library" description="Every image and PDF from the old site keeps its original web address. New uploads are stored in R2." />
+      <PageHeader icon="image" title="All files" description="Every image and PDF on the website. Old files keep their original web address; new uploads are added here." />
       {hasRole(user, "editor") ? (
         <Card title="Upload" className="mb-6">
           <form action="/admin/media-upload/" method="post" encType="multipart/form-data" className="grid gap-3 sm:grid-cols-[2fr_1fr_2fr_auto] sm:items-end">

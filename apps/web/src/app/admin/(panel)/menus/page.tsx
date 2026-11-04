@@ -7,7 +7,7 @@ import { ConfirmButton, SubmitButton } from "@/lib/admin/client";
 import { Card, Field, PageHeader } from "@/lib/admin/ui";
 import { addItem, deleteItem, saveItem } from "./actions";
 
-export const metadata: Metadata = { title: "Menus" };
+export const metadata: Metadata = { title: "Menus and social links" };
 
 type Item = typeof s.menuItems.$inferSelect;
 
@@ -57,7 +57,7 @@ export default async function MenusPage() {
   const [menus, items] = await Promise.all([db.select().from(s.menus), db.select().from(s.menuItems).orderBy(asc(s.menuItems.sort), asc(s.menuItems.id))]);
   return (
     <>
-      <PageHeader icon="menu" title="Menus" description="The header menu and the social links shown on every page. Changes appear on the website immediately." />
+      <PageHeader icon="menu" title="Menus and social links" description="The header menu and the social links shown on every page. Changes appear on the website immediately." />
       <div className="space-y-6">
         {menus.map((m) => {
           const mine = items.filter((i) => i.menuId === m.id);

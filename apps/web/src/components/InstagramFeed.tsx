@@ -108,8 +108,8 @@ function PostBadge({ kind }: { kind: IgPost["kind"] }) {
 export async function InstagramFeed({ section }: { section: LayoutSection }) {
   const handle = instagramHandle(section.data);
   const profileUrl = `https://www.instagram.com/${handle}/`;
-  // The grid is three across, so whole rows only.
-  const count = Math.max(3, Math.floor(Math.min(12, Math.max(3, Number(section.data.count) || 6)) / 3) * 3);
+  // The grid is four across, so whole rows only.
+  const count = Math.min(12, Math.ceil(Math.max(4, Number(section.data.count) || 8) / 4) * 4);
   const token = (getEnv() as unknown as Record<string, string | undefined>).INSTAGRAM_ACCESS_TOKEN;
   const [posts, profile] = token ? await Promise.all([fetchPosts(token, count), fetchProfile(token)]) : [[] as IgPost[], null];
   const title = section.title ?? "Follow us on Instagram";
@@ -135,8 +135,8 @@ export async function InstagramFeed({ section }: { section: LayoutSection }) {
           <p className="mx-auto mt-5 max-w-2xl text-base leading-relaxed text-muted sm:text-lg">Moments, campaigns and programmes straight from our Instagram page. This block updates by itself whenever GIO posts something new.</p>
         </div>
 
-        <div className="mx-auto mt-9 max-w-6xl rounded-[2rem] bg-white p-5 shadow-[0_30px_80px_-34px_rgb(11_41_68/0.35)] ring-1 ring-line/70 sm:p-7 lg:mt-12 lg:p-9">
-          <div className="grid items-center gap-7 lg:grid-cols-[minmax(0,1fr)_minmax(0,1.9fr)] lg:gap-10">
+        <div className="mx-auto mt-9 rounded-[2rem] bg-white p-5 shadow-[0_30px_80px_-34px_rgb(11_41_68/0.35)] ring-1 ring-line/70 sm:p-7 lg:mt-12 lg:p-9">
+          <div className="grid items-center gap-7 lg:grid-cols-[minmax(0,1fr)_minmax(0,2.6fr)] lg:gap-10">
             <div className="reveal-left">
               <div className="flex items-start gap-4">
                 <span className="ig-ring relative block h-[4.5rem] w-[4.5rem] shrink-0 sm:h-24 sm:w-24">
@@ -167,7 +167,7 @@ export async function InstagramFeed({ section }: { section: LayoutSection }) {
             </div>
 
             {posts.length ? (
-              <ul className="reveal-group grid grid-cols-3 gap-2 sm:gap-3">
+              <ul className="reveal-group grid grid-cols-2 gap-2 sm:grid-cols-4 sm:gap-3">
                 {posts.map((p) => (
                   <li key={p.id}>
                     <a

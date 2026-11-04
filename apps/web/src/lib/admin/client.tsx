@@ -1,26 +1,13 @@
 "use client";
 // Interactive admin pieces: submit buttons with pending state, confirmed deletes,
-// flash messages and the media picker.
+// flash messages and the image field.
 import { useRouter, useSearchParams, usePathname } from "next/navigation";
-import { useEffect, useMemo, useRef, useState, type ReactNode } from "react";
+import { useEffect, useRef, useState, type ReactNode } from "react";
 import { useFormStatus } from "react-dom";
 import { EyeIcon, EyeOffIcon } from "@/components/Icons";
-import { LIMITS } from "./files";
+import { ACCEPT, fileProblem, IMAGE_TYPES, MediaDialog, type MediaOption } from "./media-dialog";
 
-const IMAGE_TYPES = ["image/jpeg", "image/png", "image/gif", "image/webp"];
-const ACCEPT = { image: IMAGE_TYPES.join(","), pdf: "application/pdf", any: [...IMAGE_TYPES, "application/pdf"].join(",") };
-
-/** Browser-side check before upload (the server checks the bytes again). Null when fine. */
-function fileProblem(f: File, accept: keyof typeof ACCEPT): string | null {
-  const isImage = IMAGE_TYPES.includes(f.type);
-  const isPdf = f.type === "application/pdf";
-  if (accept === "image" && !isImage) return `${f.name}: choose a JPEG, PNG, GIF or WebP image.`;
-  if (accept === "pdf" && !isPdf) return `${f.name}: choose a PDF.`;
-  if (accept === "any" && !isImage && !isPdf) return `${f.name}: only images (JPEG, PNG, GIF, WebP) and PDFs.`;
-  const max = isPdf ? LIMITS.document : LIMITS.image;
-  if (f.size > max) return `${f.name} is ${(f.size / 1048576).toFixed(1)} MB; the limit is ${max / 1048576} MB.`;
-  return null;
-}
+export type { MediaOption };
 
 /** Password input with an eye button that switches between hidden and visible text. */
 export function PasswordInput({ id, name, autoComplete, required = false }: { id?: string; name: string; autoComplete?: string; required?: boolean }) {
@@ -42,55 +29,8 @@ export function PasswordInput({ id, name, autoComplete, required = false }: { id
   );
 }
 
-/** Textarea for HTML with a small toolbar, so editors do not have to type tags by hand. */
-type EditorTool = "bold" | "italic" | "heading" | "paragraph" | "link" | "list" | "quote";
-const EDITOR_TOOLS: { id: EditorTool; label: string; title: string; className?: string }[] = [
-  { id: "bold", label: "B", title: "Bold", className: "font-bold" },
-  { id: "italic", label: "I", title: "Italic", className: "italic" },
-  { id: "heading", label: "H2", title: "Heading" },
-  { id: "paragraph", label: "¶", title: "Paragraph" },
-  { id: "link", label: "Link", title: "Link" },
-  { id: "list", label: "• List", title: "Bulleted list" },
-  { id: "quote", label: "“ ”", title: "Quote" },
-];
-
-export function HtmlEditor({ name, defaultValue = "", rows = 18, disabled = false }: { name: string; defaultValue?: string; rows?: number; disabled?: boolean }) {
-  const ref = useRef<HTMLTextAreaElement>(null);
-  const apply = (tool: EditorTool) => {
-    const el = ref.current;
-    if (!el) return;
-    const wrap = (before: string, after: string, placeholder: string) => {
-      const selected = el.value.slice(el.selectionStart, el.selectionEnd) || placeholder;
-      el.focus();
-      el.setRangeText(before + selected + after, el.selectionStart, el.selectionEnd, "select");
-    };
-    if (tool === "bold") wrap("<strong>", "</strong>", "bold text");
-    else if (tool === "italic") wrap("<em>", "</em>", "italic text");
-    else if (tool === "heading") wrap("<h2>", "</h2>", "Heading");
-    else if (tool === "paragraph") wrap("<p>", "</p>", "Write here");
-    else if (tool === "list") wrap("<ul>\n  <li>", "</li>\n</ul>", "item");
-    else if (tool === "quote") wrap("<blockquote>", "</blockquote>", "quote");
-    else {
-      const url = window.prompt("Link address, for example https://example.org or /about-us/");
-      if (url) wrap(`<a href="${url.replaceAll('"', "&quot;")}">`, "</a>", "link text");
-    }
-  };
-  return (
-    <div>
-      {disabled ? null : (
-        <div className="flex flex-wrap items-center gap-1 rounded-t-[0.6rem] border border-b-0 border-[#cfd8e3] bg-paper px-2 py-1.5" role="toolbar" aria-label="Formatting">
-          {EDITOR_TOOLS.map((t) => (
-            <button key={t.id} type="button" title={t.title} onClick={() => apply(t.id)} className={`rounded-md px-2.5 py-1 text-sm text-slate-700 transition-colors hover:bg-white hover:text-brand-700 hover:shadow-sm ${t.className ?? ""}`}>
-              {t.label}
-            </button>
-          ))}
-          <span className="ml-auto pr-1 text-[11px] uppercase tracking-wide text-slate-400">HTML</span>
-        </div>
-      )}
-      <textarea ref={ref} name={name} rows={rows} defaultValue={defaultValue} disabled={disabled} className={`field font-mono text-sm leading-relaxed ${disabled ? "" : "rounded-t-none"}`} />
-    </div>
-  );
-}
+/** The rich text editor every text box in the admin uses (formatting, images, videos, tables, buttons). See ./rich-editor.tsx. */
+export { RichEditor as HtmlEditor } from "./rich-editor";
 
 /** File input that previews chosen images and blocks the submit when a file is the wrong type or too big. */
 export function FileInput({ name, accept = "any", multiple = false, required = false }: { name: string; accept?: keyof typeof ACCEPT; multiple?: boolean; required?: boolean }) {
@@ -238,17 +178,10 @@ export function Flash() {
   );
 }
 
-export interface MediaOption {
-  id: number;
-  url: string;
-  name: string;
-  alt: string | null;
-}
-
 /**
  * Picks an image from the media library. Submits the chosen id as a hidden input named `name`.
  * Pass `options` (from listImageOptions()) or leave it out: the list is then fetched from
- * /admin/media-options/ when the dialog opens. `preview` shows the current image before that.
+ * /admin/media-options/ when the window opens. `preview` shows the current image before that.
  */
 export function MediaPicker({
   name,
@@ -267,57 +200,23 @@ export function MediaPicker({
   folder?: string;
 }) {
   const [id, setId] = useState<number | null>(defaultId ?? null);
+  const [picked, setPicked] = useState<MediaOption | null>(null);
   const [open, setOpen] = useState(false);
-  const [q, setQ] = useState("");
-  const [limit, setLimit] = useState(60);
-  const [loaded, setLoaded] = useState<MediaOption[] | null>(null);
-  const [uploaded, setUploaded] = useState<MediaOption[]>([]);
-  const [uploading, setUploading] = useState(false);
-  const [uploadError, setUploadError] = useState<string | null>(null);
-  const fileRef = useRef<HTMLInputElement>(null);
-  const options = useMemo(() => [...uploaded, ...(given ?? loaded ?? []).filter((o) => !uploaded.some((u) => u.id === o.id))], [given, loaded, uploaded]);
-
-  async function upload(f: File) {
-    const p = fileProblem(f, "image");
-    if (p) return setUploadError(p);
-    setUploading(true);
-    setUploadError(null);
-    try {
-      const body = new FormData();
-      body.set("file", f);
-      body.set("kind", "image");
-      body.set("folder", folder);
-      const res = await fetch("/admin/media-upload/?json=1", { method: "POST", body });
-      const data = (await res.json().catch(() => ({ ok: false, error: `Upload failed (${res.status}).` }))) as { ok: boolean; error?: string; media?: MediaOption };
-      if (!data.ok || !data.media) throw new Error(data.error ?? "Upload failed.");
-      setUploaded((u) => [data.media!, ...u]);
-      setId(data.media.id);
-      setOpen(false);
-    } catch (e) {
-      setUploadError(e instanceof Error ? e.message : String(e));
-    } finally {
-      setUploading(false);
-      if (fileRef.current) fileRef.current.value = "";
-    }
-  }
+  const hidden = useRef<HTMLInputElement>(null);
+  const shownId = useRef(id);
+  // The hidden field changes without a keystroke; tell the surrounding form so it knows it has unsaved changes.
   useEffect(() => {
-    if (!open || given || loaded) return;
-    fetch("/admin/media-options/")
-      .then((r) => (r.ok ? (r.json() as Promise<MediaOption[]>) : []))
-      .then((x) => setLoaded(x))
-      .catch(() => setLoaded([]));
-  }, [open, given, loaded]);
-  const byId = useMemo(() => new Map(options.map((o) => [o.id, o])), [options]);
-  const current = id !== null ? (byId.get(id) ?? (preview?.id === id ? preview : undefined)) : undefined;
-  const filtered = useMemo(() => {
-    const t = q.trim().toLowerCase();
-    return t ? options.filter((o) => o.name.toLowerCase().includes(t) || (o.alt ?? "").toLowerCase().includes(t) || String(o.id) === t) : options;
-  }, [q, options]);
+    if (shownId.current === id) return;
+    shownId.current = id;
+    hidden.current?.dispatchEvent(new Event("input", { bubbles: true }));
+  }, [id]);
+
+  const current = id === null ? undefined : picked?.id === id ? picked : preview?.id === id ? preview : given?.find((o) => o.id === id);
 
   return (
     <div>
       <span className="label">{label}</span>
-      <input type="hidden" name={name} value={id ?? ""} />
+      <input ref={hidden} type="hidden" name={name} value={id ?? ""} />
       <div className="flex items-center gap-3">
         <div className="flex h-20 w-28 items-center justify-center overflow-hidden rounded-lg border border-line bg-paper">
           {current ? (
@@ -339,64 +238,18 @@ export function MediaPicker({
         </div>
         {current ? <span className="hidden max-w-[16rem] truncate text-xs text-muted sm:block">{current.name}</span> : null}
       </div>
-
-      {open ? (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4" onClick={() => setOpen(false)}>
-          <div className="flex max-h-[85vh] w-full max-w-4xl flex-col rounded-xl bg-white shadow-2xl" onClick={(e) => e.stopPropagation()}>
-            <div className="flex flex-wrap items-center gap-3 border-b border-line p-4">
-              <input className="field min-w-0 flex-1" placeholder="Search file name, alt text or id" value={q} onChange={(e) => setQ(e.target.value)} autoFocus />
-              <input
-                ref={fileRef}
-                type="file"
-                accept={ACCEPT.image}
-                className="hidden"
-                data-picker-upload
-                onChange={(e) => {
-                  const f = e.currentTarget.files?.[0];
-                  if (f) void upload(f);
-                }}
-              />
-              <button type="button" className="btn btn-primary" disabled={uploading} onClick={() => fileRef.current?.click()}>
-                {uploading ? "Uploading…" : "Upload new image"}
-              </button>
-              <button type="button" className="btn btn-ghost" onClick={() => setOpen(false)}>
-                Close
-              </button>
-              {uploadError ? <p className="w-full text-sm font-medium text-danger-700">{uploadError}</p> : null}
-            </div>
-            <div className="grid grid-cols-3 gap-3 overflow-y-auto p-4 sm:grid-cols-4 md:grid-cols-6">
-              {filtered.slice(0, limit).map((o) => (
-                <button
-                  key={o.id}
-                  type="button"
-                  title={o.name}
-                  onClick={() => {
-                    setId(o.id);
-                    setOpen(false);
-                  }}
-                  className={`group overflow-hidden rounded-lg border text-left ${o.id === id ? "border-brand-600 ring-2 ring-brand-400" : "border-line hover:border-brand-300"}`}
-                >
-                  {/* eslint-disable-next-line @next/next/no-img-element */}
-                  <img src={o.url} alt={o.alt ?? ""} loading="lazy" className="aspect-square w-full bg-paper object-cover" />
-                  <span className="block truncate px-1.5 py-1 text-[11px] text-muted">
-                    #{o.id} {o.name}
-                  </span>
-                </button>
-              ))}
-              {filtered.length === 0 ? (
-                <p className="col-span-full py-8 text-center text-sm text-muted">{!given && !loaded ? "Loading images…" : "No images match."}</p>
-              ) : null}
-            </div>
-            {filtered.length > limit ? (
-              <div className="border-t border-line p-3 text-center">
-                <button type="button" className="btn btn-ghost" onClick={() => setLimit((l) => l + 60)}>
-                  Show more ({filtered.length - limit} left)
-                </button>
-              </div>
-            ) : null}
-          </div>
-        </div>
-      ) : null}
+      <MediaDialog
+        open={open}
+        onClose={() => setOpen(false)}
+        options={given}
+        selectedId={id}
+        folder={folder}
+        onPick={(o) => {
+          setPicked(o);
+          setId(o.id);
+          setOpen(false);
+        }}
+      />
     </div>
   );
 }

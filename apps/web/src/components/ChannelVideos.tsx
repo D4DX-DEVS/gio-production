@@ -1,6 +1,7 @@
 import type { LayoutItem } from "@gio/db/layout";
 import { CHANNEL_URL, bestPoster, channelVideos, videoTitle, youtubeId } from "@/lib/youtube";
 import { Container } from "./ui";
+import { VideoBackdrop } from "./VideoBackdrop";
 import { VideoCards, type VideoCard } from "./VideoCards";
 
 /**
@@ -38,9 +39,8 @@ export async function ChannelVideos({
   const videos = picked.map((v, k) => ({ ...v, poster: posters[k] }));
 
   return (
-    <section className="relative overflow-hidden bg-brand-900 py-10 text-white sm:py-12 lg:py-14">
-      <div className="pointer-events-none absolute -left-32 top-0 h-80 w-80 rounded-full bg-brand-500/30 blur-3xl" />
-      <div className="pointer-events-none absolute -bottom-24 -right-24 h-64 w-64 rounded-full bg-accent-600/15 blur-3xl" />
+    <section className="video-band relative overflow-hidden py-12 text-white sm:py-14 lg:py-16">
+      <VideoBackdrop />
       <Container className="relative">
         <div className="reveal mb-5 flex flex-wrap items-end justify-between gap-3 sm:mb-6">
           <div>
