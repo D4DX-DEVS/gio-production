@@ -9,12 +9,22 @@ import { eq } from "drizzle-orm";
 import { schema as s } from "@gio/db";
 import { getDb, getEnv } from "@/lib/db";
 import { audit, hasRole } from "@/lib/admin/guard";
-import { getAdminUser } from "@/lib/auth";
+import { getAdminUser, trustedOrigins } from "@/lib/auth";
+import { isSameOrigin } from "@/lib/admin/same-origin";
 import { dimensions, FOLDERS, LIMITS, newKey, sha256Hex, sniff, type Folder } from "@/lib/admin/files";
 import { mediaUrl } from "@/lib/admin/media-options";
 import { replaceMediaEverywhere } from "@/lib/admin/usage";
 
 const RETURN_PATHS = ["/admin/media/", "/admin/documents/"];
+
+/** The site address from the environment; none when it is missing or malformed (the Host headers still decide). */
+function configuredOrigins(): string[] {
+  try {
+    return trustedOrigins(getEnv().BETTER_AUTH_URL);
+  } catch {
+    return [];
+  }
+}
 
 export async function POST(req: NextRequest) {
   const user = await getAdminUser();
@@ -26,8 +36,15 @@ export async function POST(req: NextRequest) {
 
   if (!user) return json ? NextResponse.json({ ok: false, error: "Sign in again." }, { status: 401 }) : NextResponse.redirect(new URL("/admin/login/", req.url), 303);
   // Same-origin check: a form on another site must not be able to upload with our cookies.
-  const origin = req.headers.get("origin");
-  if (!origin || new URL(origin).host !== req.nextUrl.host) return reply("/admin/media/", "error", "Upload refused (wrong origin).", {}, 403);
+  // (req.nextUrl.host alone is not the address the browser used behind Cloudflare, so the Host headers count too.)
+  const sameOrigin = isSameOrigin({
+    origin: req.headers.get("origin"),
+    host: req.headers.get("host"),
+    forwardedHost: req.headers.get("x-forwarded-host"),
+    urlHost: req.nextUrl.host,
+    trusted: configuredOrigins(),
+  });
+  if (!sameOrigin) return reply("/admin/media/", "error", "Upload refused (wrong origin).", {}, 403);
 
   let fd: FormData;
   try {
