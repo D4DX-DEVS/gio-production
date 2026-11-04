@@ -13,6 +13,7 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
     ...events.map((e) => ({ url: `${ORIGIN}/event/${encodeURIComponent(e.slug)}/`, lastModified: e.updatedAt })),
     { url: `${ORIGIN}/events/` },
     { url: `${ORIGIN}/gallery/` },
+    { url: `${ORIGIN}/posters/` },
     { url: `${ORIGIN}/documents/` },
   ];
 }

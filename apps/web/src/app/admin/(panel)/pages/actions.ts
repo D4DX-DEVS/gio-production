@@ -2,7 +2,7 @@
 // Saving a page's sections and their items. Every write here ends with goLive, so the website shows the
 // change at once; the screens call these from a Save button (SectionForm) or a one-click button (ActionButton)
 // and get a SaveResult back instead of a redirect, which keeps the editor where they are.
-import { and, asc, eq, inArray, max } from "drizzle-orm";
+import { and, asc, eq, inArray, max, min } from "drizzle-orm";
 import { PAGE_STATUSES, SECTION_TYPES, type SectionType } from "@gio/db/schema";
 import { schema } from "@gio/db";
 import { getDb } from "@/lib/db";
@@ -245,18 +245,45 @@ async function itemInPage(pageId: number, itemId: number) {
   return row;
 }
 
-/** Add an item at the end of a section, from the "Add" form under it. The form's fields are checked like a save. */
+/** Most images one "Add" can take at once. */
+const MAX_BULK_ADD = 50;
+const ITEM_NOUN: Partial<Record<SectionType, string>> = { poster_slider: "poster", image: "poster", hero_carousel: "slide", image_banner: "banner", logo_carousel: "logo" };
+
+/**
+ * Add an item at the end of a section, from the "Add" form above its list. The form's fields are checked like a save.
+ * A form that sends `mediaIds` ("12,15,9", the image picker with many images) adds one item per image, in that order,
+ * all with the form's description, link and visibility.
+ */
 export async function addItem(pageId: number, sectionId: number, _prev: SaveResult | null, fd: FormData): Promise<SaveResult> {
   const { user } = await requireRole("editor");
   return runSave(async () => {
     const db = getDb();
     const sec = await sectionInPage(pageId, sectionId);
+    const [{ m, lo }] = await db.select({ m: max(sectionItems.sort), lo: min(sectionItems.sort) }).from(sectionItems).where(eq(sectionItems.sectionId, sectionId));
+    // New posters go to the top of the list: the homepage row shows the first ones, so the newest upload is seen first.
+    const onTop = sec.type === "poster_slider" || sec.type === "image";
+    const sortFor = (i: number, n: number) => (onTop ? (lo ?? 10) - 10 * (n - i) : (m ?? 0) + 10 * (i + 1));
+
+    if (fd.has("mediaIds")) {
+      const ids = [...new Set((str(fd, "mediaIds") ?? "").split(",").map(Number).filter((n) => Number.isInteger(n) && n > 0))];
+      if (!ids.length) throw new FormError("Choose or upload at least one image first.");
+      if (ids.length > MAX_BULK_ADD) throw new FormError(`Add at most ${MAX_BULK_ADD} images at a time.`);
+      const shared = parseItem(sec.type, fd);
+      const rows = ids.map((mediaId, i) => ({ ...shared, mediaId, sectionId, sort: sortFor(i, ids.length), source: "manual" as const }));
+      await verifyMedia(sec.type, rows);
+      await db.batch(rows.map((r) => db.insert(sectionItems).values(r)) as unknown as [never, ...never[]]);
+      await audit(user.id, "create", "section", sectionId, `page ${pageId}, ${sec.type}, ${rows.length} items`);
+      await goLive(db, pageId, user.id);
+      const noun = ITEM_NOUN[sec.type] ?? "item";
+      const what = rows.length === 1 ? `1 ${noun}` : `${rows.length} ${noun}s`;
+      return shared.isVisible ? `Added ${what}. ${rows.length === 1 ? "It is" : "They are"} on the website now.` : `Added ${what}, but hidden: ${rows.length === 1 ? "it is" : "they are"} not on the website until you switch ${rows.length === 1 ? "it" : "them"} on.`;
+    }
+
     const values = parseItem(sec.type, fd);
     await verifyMedia(sec.type, [values]);
-    const [{ m }] = await db.select({ m: max(sectionItems.sort) }).from(sectionItems).where(eq(sectionItems.sectionId, sectionId));
     const [row] = await db
       .insert(sectionItems)
-      .values({ ...values, sectionId, sort: (m ?? 0) + 10, source: "manual" })
+      .values({ ...values, sectionId, sort: sortFor(0, 1), source: "manual" })
       .returning({ id: sectionItems.id });
     await audit(user.id, "create", "section_item", row.id, `page ${pageId}, ${sec.type}`);
     await goLive(db, pageId, user.id);
@@ -328,6 +355,62 @@ export async function moveItem(pageId: number, itemId: number, dir: -1 | 1): Pro
     await goLive(db, pageId, user.id);
     return "Moved. The website shows the new order.";
   });
+}
+
+/**
+ * Put a section's items in the order given (drag and drop on the arrange strip). `orderedIds` is the whole list as the
+ * editor sees it; an item missing from it (added meanwhile) keeps its place after the others. Only rows whose position
+ * changes are written, so imported rows that stay put keep their updated_at (the importer reads it).
+ */
+export async function reorderItems(pageId: number, sectionId: number, orderedIds: number[]): Promise<SaveResult> {
+  const { user } = await requireRole("editor");
+  return runSave(async () => {
+    const db = getDb();
+    await sectionInPage(pageId, sectionId);
+    const n = await applyOrder(db, sectionId, orderedIds);
+    if (n === null) return "Already in that order.";
+    await audit(user.id, "reorder", "section", sectionId, `page ${pageId}, ${n} items`);
+    await goLive(db, pageId, user.id);
+    return "New order saved. The website shows it now.";
+  });
+}
+
+/** Newest upload first (ties keep their current order). The homepage poster row shows the first ones, so this puts the latest on it. */
+export async function sortItemsNewestFirst(pageId: number, sectionId: number): Promise<SaveResult> {
+  const { user } = await requireRole("editor");
+  return runSave(async () => {
+    const db = getDb();
+    await sectionInPage(pageId, sectionId);
+    const rows = await db.select({ id: sectionItems.id, createdAt: sectionItems.createdAt, sort: sectionItems.sort }).from(sectionItems).where(eq(sectionItems.sectionId, sectionId));
+    const newest = rows.sort((a, b) => b.createdAt.getTime() - a.createdAt.getTime() || a.sort - b.sort || a.id - b.id).map((r) => r.id);
+    const n = await applyOrder(db, sectionId, newest);
+    if (n === null) return "The newest uploads are already first.";
+    await audit(user.id, "reorder", "section", sectionId, `page ${pageId}, newest first, ${n} items`);
+    await goLive(db, pageId, user.id);
+    return "Newest uploads are first now. The website shows it.";
+  });
+}
+
+/**
+ * Write `orderedIds` as the section's order (10, 20, 30, …). Ids not in the section are ignored and items missing from the
+ * list keep their place after the others. Returns the item count, or null when nothing had to change.
+ */
+async function applyOrder(db: ReturnType<typeof getDb>, sectionId: number, orderedIds: number[]): Promise<number | null> {
+  const existing = await db
+    .select({ id: sectionItems.id, sort: sectionItems.sort })
+    .from(sectionItems)
+    .where(eq(sectionItems.sectionId, sectionId))
+    .orderBy(asc(sectionItems.sort), asc(sectionItems.id));
+  const known = new Set(existing.map((e) => e.id));
+  const wanted = [...new Set(orderedIds.filter((id) => Number.isInteger(id) && known.has(id)))];
+  const order = [...wanted, ...existing.map((e) => e.id).filter((id) => !wanted.includes(id))];
+  const now = new Date();
+  const bySort = new Map(existing.map((e) => [e.id, e.sort]));
+  const writes = order.flatMap((id, k) => ((k + 1) * 10 === bySort.get(id) ? [] : [db.update(sectionItems).set({ sort: (k + 1) * 10, updatedAt: now }).where(eq(sectionItems.id, id))]));
+  if (!writes.length) return null;
+  // D1 takes a batch in one go; keep each one modest.
+  for (let i = 0; i < writes.length; i += 80) await db.batch(writes.slice(i, i + 80) as unknown as [never, ...never[]]);
+  return order.length;
 }
 
 export async function deleteItem(pageId: number, itemId: number): Promise<SaveResult> {

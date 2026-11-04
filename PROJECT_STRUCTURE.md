@@ -47,7 +47,7 @@ The admin menu is a vertical sidebar (`apps/web/src/app/admin/(panel)/layout.tsx
 | Looking for | Location |
 |---|---|
 | Public pages | `apps/web/src/app/(site)/` (homepage: `page.tsx`) |
-| Admin dashboard | `apps/web/src/app/admin/(panel)/`, one folder per section: `posts`, `pages`, `events`, `leaders`, `media`, `gallery`, `documents`, `menus`, `homepage`, `inbox`, `review`, `urls`, `settings`, `users` |
+| Admin dashboard | `apps/web/src/app/admin/(panel)/`, one folder per section: `posts`, `pages`, `events`, `leaders`, `media`, `gallery`, `documents`, `menus`, `homepage`, `inbox`, `settings`, `users` |
 | Admin login and security | `apps/web/src/app/admin/login/`, `apps/web/src/app/admin/sign-in/route.ts`, `apps/web/src/lib/auth.ts`, `apps/web/src/lib/admin/` (two-factor, rate limiting, access guard) |
 | API routes | `apps/web/src/app/api/auth/`, `admin/sign-in/`, `admin/media-upload/`, `admin/media-options/`, `media/`, `feed/` |
 | Server actions | `actions.ts` in each admin section; `apps/web/src/lib/contact-action.ts` (contact form) |

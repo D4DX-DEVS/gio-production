@@ -1,6 +1,8 @@
 /* eslint-disable @next/next/no-img-element -- original files from R2, no transformation service */
+import Link from "next/link";
 import type { LayoutItem, LayoutMedia, LayoutSection, PageLayout } from "@gio/db/layout";
 import { encodePath, type PublicMedia } from "@/lib/content";
+import { HOME_POSTER_LIMIT, POSTERS_PATH } from "@/lib/posters";
 import { sanitize } from "@/lib/sanitize";
 import { langOf } from "@/lib/text";
 import { ChannelVideos } from "./ChannelVideos";
@@ -20,7 +22,7 @@ export function layoutMedia(m: LayoutMedia | null, alt?: string | null): PublicM
   return { id: m.id, url: encodePath(m.url), width: m.width, height: m.height, alt: alt ?? m.altText ?? "", mimeType: m.mimeType };
 }
 
-function itemLink(i: LayoutItem) {
+export function itemLink(i: LayoutItem) {
   if (!i.linkUrl) return null;
   return i.linkUrl.startsWith("/wp-content/") ? encodePath(i.linkUrl) : i.linkUrl;
 }
@@ -268,11 +270,21 @@ function Section({ section: s, pageTitle }: { section: LayoutSection; pageTitle?
       return (
         <section className="bg-paper py-10 sm:py-12 lg:py-14">
           <Container>
-            {title && <SectionHeading eyebrow="Highlights" title={title} />}
+            {/* The row shows the newest posters; "View more" opens all of them on the Posters page. */}
+            {title ? (
+              <SectionHeading eyebrow="Highlights" title={title} action={{ href: POSTERS_PATH, label: "View more" }} />
+            ) : (
+              <div className="reveal mb-4 flex justify-end">
+                <Link href={POSTERS_PATH} className="group inline-flex items-center gap-1.5 text-[0.9375rem] font-semibold text-brand-600 hover:text-accent-600">
+                  <span className="link-fx">View more</span>
+                  <ArrowRight className="icon-nudge h-4 w-4" />
+                </Link>
+              </div>
+            )}
             {/* Tapping a poster without a page link opens it full size in the lightbox. */}
             <LightboxScope className="reveal">
               <PosterMarquee label={title ?? "Highlights"}>
-                {s.items.map((i) => (
+                {s.items.slice(0, HOME_POSTER_LIMIT).map((i) => (
                   // Spacing is padding, not gap, so each copy of the row is exactly one loop wide.
                   <div key={i.id} className="shrink-0 pr-3.5 sm:pr-4 lg:pr-5">
                     {/* Hover grows the whole card (not the image inside its frame); PosterMarquee leaves room for it. */}

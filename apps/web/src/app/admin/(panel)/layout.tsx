@@ -22,7 +22,6 @@ async function signOut() {
 const HOME_SECTIONS: NavLeaf[] = [
   { href: "/admin/homepage/banners/", label: "Banners and slides" },
   { href: "/admin/homepage/about/", label: "About block" },
-  { href: "/admin/homepage/posters/", label: "Posters" },
   { href: "/admin/homepage/videos/", label: "Videos" },
   { href: "/admin/homepage/instagram/", label: "Instagram feed" },
   { href: "/admin/homepage/initiatives/", label: "Our initiatives (logos)" },
@@ -48,6 +47,8 @@ export default async function AdminLayout({ children }: { children: ReactNode })
           icon: "home",
           children: [{ href: "/admin/homepage/", label: "Order and look", match: ["/admin/homepage", ...(pagePrefix("") ?? [])] }, ...HOME_SECTIONS.map((s) => ({ ...s, match: [s.href] }))],
         },
+        // Posters are edited often, so they get their own entry instead of hiding under Home page.
+        { href: "/admin/homepage/posters/", label: "Posters", icon: "poster" },
         ...(ids.has("about-us") ? [{ href: pageHref("about-us", "/admin/pages/"), label: "About Us", icon: "about" as const, match: pagePrefix("about-us") }] : []),
         ...(ids.has("contact-us") ? [{ href: pageHref("contact-us", "/admin/pages/"), label: "Contact page", icon: "mail" as const, match: pagePrefix("contact-us") }] : []),
         ...(isAdmin
@@ -79,12 +80,8 @@ export default async function AdminLayout({ children }: { children: ReactNode })
     },
     {
       key: "inbox",
-      label: "Messages and decisions",
-      items: [
-        { href: "/admin/inbox/", label: "Contact inbox", icon: "mail", badge: badges.messages },
-        { href: "/admin/review/", label: "Client questions", icon: "review", badge: badges.review },
-        ...(isAdmin ? [{ href: "/admin/urls/", label: "Old addresses", icon: "link" as const, badge: badges.urls }] : []),
-      ],
+      label: "Messages",
+      items: [{ href: "/admin/inbox/", label: "Contact inbox", icon: "mail", badge: badges.messages }],
     },
     ...(isAdmin ? [{ key: "admin", label: "Administration", items: [{ href: "/admin/users/", label: "Admin access", icon: "access" as const }] }] : []),
   ];

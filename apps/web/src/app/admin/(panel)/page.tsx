@@ -50,13 +50,12 @@ function greeting(): string {
 export default async function Dashboard() {
   const { user } = await requireRole("contributor");
   const isEditor = hasRole(user, "editor");
-  const isAdmin = hasRole(user, "admin");
   const db = getDb();
   const s = schema;
 
   // One round trip for all the counts (eleven separate queries made this the slowest screen), in parallel with the rest.
   const [[c], fixedPages, recentPosts, recentEvents, activity, home, gallery] = await Promise.all([
-    db.all<Record<"posts" | "drafts" | "untitled" | "events" | "upcoming" | "leaders" | "documents" | "pendingReview" | "newMessages" | "noAlt" | "oldUrls", number>>(sql`select
+    db.all<Record<"posts" | "drafts" | "untitled" | "events" | "upcoming" | "leaders" | "documents" | "newMessages" | "noAlt", number>>(sql`select
       (select count(*) from ${s.posts} where ${s.posts.status} = 'published' and ${s.posts.deletedAt} is null) as posts,
       (select count(*) from ${s.posts} where ${s.posts.status} = 'draft' and ${s.posts.deletedAt} is null) as drafts,
       (select count(*) from ${s.posts} where ${s.posts.status} = 'published' and ${s.posts.deletedAt} is null and (${s.posts.title} is null or ${s.posts.title} = '')) as untitled,
@@ -64,10 +63,8 @@ export default async function Dashboard() {
       (select count(*) from ${s.events} where ${s.events.status} in ('published', 'scheduled') and ${s.events.deletedAt} is null and coalesce(${s.events.endsAt}, ${s.events.startsAt}) >= ${Date.now()}) as upcoming,
       (select count(*) from ${s.leaders}) as leaders,
       (select count(*) from ${s.documents}) as documents,
-      (select count(*) from ${s.reviewItems} where ${s.reviewItems.status} = 'pending') as pendingReview,
       (select count(*) from ${s.contactSubmissions} where ${s.contactSubmissions.status} = 'new') as newMessages,
-      (select count(*) from ${s.media} where ${s.media.kind} = 'image' and ${s.media.altText} is null and ${s.media.deletedAt} is null and ${s.media.variantOfMediaId} is null) as noAlt,
-      ${isAdmin ? sql`(select count(*) from ${s.legacyUrls} where ${s.legacyUrls.action} = 'pending_decision')` : sql`0`} as oldUrls`),
+      (select count(*) from ${s.media} where ${s.media.kind} = 'image' and ${s.media.altText} is null and ${s.media.deletedAt} is null and ${s.media.variantOfMediaId} is null) as noAlt`),
     fixedPageIds(),
     db
       .select({ id: s.posts.id, title: s.posts.title, status: s.posts.status, updatedAt: s.posts.updatedAt })
@@ -85,7 +82,7 @@ export default async function Dashboard() {
     homepageCounts(db),
     galleryCount(db),
   ]);
-  const { posts, drafts, untitled, events, upcoming, leaders, documents, pendingReview, newMessages, noAlt, oldUrls } = Object.fromEntries(Object.entries(c ?? {}).map(([k, v]) => [k, Number(v) || 0])) as Record<keyof NonNullable<typeof c>, number>;
+  const { posts, drafts, untitled, events, upcoming, leaders, documents, newMessages, noAlt } = Object.fromEntries(Object.entries(c ?? {}).map(([k, v]) => [k, Number(v) || 0])) as Record<keyof NonNullable<typeof c>, number>;
   const pageHref = (slug: string) => (fixedPages.has(slug) ? `/admin/pages/${fixedPages.get(slug)}/` : "/admin/pages/");
 
   const recent = [
@@ -100,10 +97,6 @@ export default async function Dashboard() {
 
   // Most important first. Red is for things that block or confuse visitors; the rest are tidy-ups.
   const needs: { tag: string; tone: keyof typeof TAG; title: string; text: string; action: string; href: string }[] = [
-    ...(pendingReview
-      ? [{ tag: "Client", tone: "soft" as const, title: `${plural(pendingReview, "decision is", "decisions are")} waiting`, text: "Nothing changes on the site until someone with authority decides.", action: "Open", href: "/admin/review/" }]
-      : []),
-    ...(oldUrls ? [{ tag: "Redirects", tone: "soft" as const, title: `${plural(oldUrls, "old address", "old addresses")} ${oldUrls === 1 ? "waits" : "wait"} for a decision`, text: "Visitors who open them today reach a missing page.", action: "Decide", href: "/admin/urls/" }] : []),
     ...(newMessages ? [{ tag: "Inbox", tone: "red" as const, title: `${plural(newMessages, "new message")} from the Contact Us form`, text: "Someone is waiting for a reply.", action: "Read", href: "/admin/inbox/" }] : []),
     ...(noAlt ? [{ tag: "Access", tone: "soft" as const, title: `${plural(noAlt, "image")} ${noAlt === 1 ? "has" : "have"} no alt text`, text: "Screen readers skip them. Describe them in the Library.", action: "Fix", href: "/admin/media/?filter=no-alt" }] : []),
     ...(untitled ? [{ tag: "Story", tone: "grey" as const, title: `${plural(untitled, "published story has", "published stories have")} no title`, text: "It is live without a headline. Open it and add one.", action: "Open", href: "/admin/posts/" }] : []),
@@ -142,9 +135,7 @@ export default async function Dashboard() {
           {greeting()}, {user.name}.
         </h1>
         <p className="max-w-[60ch] text-lg text-muted">
-          {pendingReview || newMessages
-            ? [pendingReview ? `${plural(pendingReview, "question")} still waiting on the client` : null, newMessages ? plural(newMessages, "new message") : null].filter(Boolean).join(", ") + "."
-            : "Nothing is waiting on you. Pick a job below to get started."}
+          {newMessages ? `${plural(newMessages, "new message")} waiting.` : "Nothing is waiting on you. Pick a job below to get started."}
         </p>
       </section>
 

@@ -253,3 +253,76 @@ export function MediaPicker({
     </div>
   );
 }
+
+/**
+ * Picks several images from the media library, or uploads many at once from the computer. Submits the ids,
+ * in the order shown, as one hidden input named `name` ("12,15,9"). Each id becomes its own item on the server.
+ */
+export function MediaMultiPicker({ name, label = "Images", folder = "images" }: { name: string; label?: string; folder?: string }) {
+  const [items, setItems] = useState<MediaOption[]>([]);
+  const [open, setOpen] = useState(false);
+  const hidden = useRef<HTMLInputElement>(null);
+  const value = items.map((i) => i.id).join(",");
+  const shown = useRef(value);
+  // The hidden field changes without a keystroke; tell the surrounding form so it knows it has unsaved changes.
+  useEffect(() => {
+    if (shown.current === value) return;
+    shown.current = value;
+    hidden.current?.dispatchEvent(new Event("input", { bubbles: true }));
+  }, [value]);
+
+  return (
+    <div>
+      <span className="label">{label}</span>
+      <input ref={hidden} type="hidden" name={name} value={value} />
+      <div className="flex flex-wrap items-center gap-3">
+        <button type="button" className="btn btn-ghost" onClick={() => setOpen(true)}>
+          {items.length ? "Change…" : "Choose…"}
+        </button>
+        {items.length ? (
+          <button type="button" className="text-xs text-danger-700 hover:underline" onClick={() => setItems([])}>
+            Remove all
+          </button>
+        ) : (
+          <span className="text-xs text-muted">None chosen. In the window, “Upload new images” takes as many files as you select.</span>
+        )}
+      </div>
+      {items.length ? (
+        <>
+          <ul className="mt-3 flex flex-wrap gap-2" aria-label={`${items.length} chosen`}>
+            {items.map((o, k) => (
+              <li key={o.id} className="relative h-24 w-[4.75rem] overflow-hidden rounded-lg border border-line bg-paper" title={o.name}>
+                {/* eslint-disable-next-line @next/next/no-img-element */}
+                <img src={o.url} alt={o.alt ?? ""} className="h-full w-full object-cover" loading="lazy" />
+                <span className="absolute left-1 top-1 grid h-5 min-w-5 place-items-center rounded-full bg-brand-600 px-1 text-[11px] font-bold tabular-nums text-white shadow">{k + 1}</span>
+                <button
+                  type="button"
+                  aria-label={`Remove ${o.name}`}
+                  className="absolute right-1 top-1 grid h-5 w-5 place-items-center rounded-full bg-black/60 text-xs font-bold leading-none text-white hover:bg-danger-700"
+                  onClick={() => setItems((all) => all.filter((x) => x.id !== o.id))}
+                >
+                  ×
+                </button>
+              </li>
+            ))}
+          </ul>
+          <p className="mt-1.5 text-xs text-muted">{items.length === 1 ? "1 image will be added." : `${items.length} images will be added, one each.`}</p>
+        </>
+      ) : null}
+      {/* Mounted only while open, so each opening starts from what is chosen now. */}
+      {open ? (
+        <MediaDialog
+          open
+          onClose={() => setOpen(false)}
+          multiple
+          initial={items}
+          folder={folder}
+          onPickMany={(picked) => {
+            setItems(picked);
+            setOpen(false);
+          }}
+        />
+      ) : null}
+    </div>
+  );
+}

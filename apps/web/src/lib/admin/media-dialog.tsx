@@ -31,13 +31,22 @@ export function MediaDialog({
   open,
   onClose,
   onPick,
+  multiple = false,
+  onPickMany,
+  initial,
   options: given,
   selectedId,
   folder = "images",
 }: {
   open: boolean;
   onClose: () => void;
-  onPick: (option: MediaOption) => void;
+  /** One image: clicking a picture (or uploading one) chooses it. */
+  onPick?: (option: MediaOption) => void;
+  /** Several images: pictures toggle on and off, uploads take many files at once, and "Use selected" calls `onPickMany`. */
+  multiple?: boolean;
+  onPickMany?: (options: MediaOption[]) => void;
+  /** With `multiple`: what is already chosen when the window is mounted. */
+  initial?: MediaOption[];
   options?: MediaOption[];
   selectedId?: number | null;
   /** R2 folder for images uploaded from here (images, banners, leaders, logos). */
@@ -47,8 +56,11 @@ export function MediaDialog({
   const [limit, setLimit] = useState(60);
   const [loaded, setLoaded] = useState<MediaOption[] | null>(null);
   const [uploaded, setUploaded] = useState<MediaOption[]>([]);
-  const [uploading, setUploading] = useState(false);
+  const [uploading, setUploading] = useState<string | null>(null);
   const [uploadError, setUploadError] = useState<string | null>(null);
+  // Several-image mode: what is ticked, in the order it was ticked (that is the order the posters get).
+  // Starts from `initial`, so mount the window only while it is open (see MediaMultiPicker).
+  const [chosen, setChosen] = useState<MediaOption[]>(() => initial ?? []);
   const fileRef = useRef<HTMLInputElement>(null);
   const options = useMemo(() => [...uploaded, ...(given ?? loaded ?? []).filter((o) => !uploaded.some((u) => u.id === o.id))], [given, loaded, uploaded]);
 
@@ -72,28 +84,49 @@ export function MediaDialog({
     return t ? options.filter((o) => o.name.toLowerCase().includes(t) || (o.alt ?? "").toLowerCase().includes(t) || String(o.id) === t) : options;
   }, [q, options]);
 
-  async function upload(f: File) {
+  /** One file per request, one after the other: a bad file names itself and the others still go through. */
+  async function uploadOne(f: File): Promise<MediaOption> {
     const p = fileProblem(f, "image");
-    if (p) return setUploadError(p);
-    setUploading(true);
+    if (p) throw new Error(p);
+    const body = new FormData();
+    body.set("file", f);
+    body.set("kind", "image");
+    body.set("folder", folder);
+    const res = await fetch("/admin/media-upload/?json=1", { method: "POST", body });
+    const data = (await res.json().catch(() => ({ ok: false, error: `Upload failed (${res.status}).` }))) as { ok: boolean; error?: string; media?: MediaOption };
+    if (!data.ok || !data.media) throw new Error(`${f.name}: ${data.error ?? "Upload failed."}`);
+    return data.media;
+  }
+
+  async function upload(files: File[]) {
     setUploadError(null);
+    const done: MediaOption[] = [];
+    const problems: string[] = [];
     try {
-      const body = new FormData();
-      body.set("file", f);
-      body.set("kind", "image");
-      body.set("folder", folder);
-      const res = await fetch("/admin/media-upload/?json=1", { method: "POST", body });
-      const data = (await res.json().catch(() => ({ ok: false, error: `Upload failed (${res.status}).` }))) as { ok: boolean; error?: string; media?: MediaOption };
-      if (!data.ok || !data.media) throw new Error(data.error ?? "Upload failed.");
-      setUploaded((u) => [data.media!, ...u]);
-      onPick(data.media);
-    } catch (e) {
-      setUploadError(e instanceof Error ? e.message : String(e));
+      for (const [i, f] of files.entries()) {
+        setUploading(files.length > 1 ? `Uploading ${i + 1} of ${files.length}…` : "Uploading…");
+        try {
+          const m = await uploadOne(f);
+          done.push(m);
+          setUploaded((u) => [m, ...u]);
+        } catch (e) {
+          problems.push(e instanceof Error ? e.message : String(e));
+        }
+      }
     } finally {
-      setUploading(false);
+      setUploading(null);
       if (fileRef.current) fileRef.current.value = "";
     }
+    if (problems.length) setUploadError(problems.join(" "));
+    if (!done.length) return;
+    if (!multiple) return onPick?.(done[0]);
+    // Everything uploaded is ticked at once. When nothing went wrong the window closes with the lot.
+    const all = [...chosen, ...done.filter((m) => !chosen.some((c) => c.id === m.id))];
+    setChosen(all);
+    if (!problems.length) onPickMany?.(all);
   }
+
+  const toggle = (o: MediaOption) => setChosen((c) => (c.some((x) => x.id === o.id) ? c.filter((x) => x.id !== o.id) : [...c, o]));
 
   if (!open) return null;
   return (
@@ -105,22 +138,23 @@ export function MediaDialog({
       onChange={(e) => e.stopPropagation()}
       onKeyDown={(e) => e.key === "Enter" && e.target instanceof HTMLInputElement && e.preventDefault()}
     >
-      <div role="dialog" aria-modal="true" aria-label="Choose an image" className="flex max-h-[85vh] w-full max-w-4xl flex-col rounded-xl bg-white shadow-2xl" onClick={(e) => e.stopPropagation()}>
+      <div role="dialog" aria-modal="true" aria-label={multiple ? "Choose images" : "Choose an image"} className="flex max-h-[85vh] w-full max-w-4xl flex-col rounded-xl bg-white shadow-2xl" onClick={(e) => e.stopPropagation()}>
         <div className="flex flex-wrap items-center gap-3 border-b border-line p-4">
           <input className="field min-w-0 flex-1" placeholder="Search file name, alt text or id" value={q} onChange={(e) => setQ(e.target.value)} autoFocus />
           <input
             ref={fileRef}
             type="file"
             accept={ACCEPT.image}
+            multiple={multiple}
             className="hidden"
             data-picker-upload
             onChange={(e) => {
-              const f = e.currentTarget.files?.[0];
-              if (f) void upload(f);
+              const files = Array.from(e.currentTarget.files ?? []);
+              if (files.length) void upload(multiple ? files : files.slice(0, 1));
             }}
           />
-          <button type="button" className="btn btn-primary" disabled={uploading} onClick={() => fileRef.current?.click()}>
-            {uploading ? "Uploading…" : "Upload new image"}
+          <button type="button" className="btn btn-primary" disabled={uploading !== null} onClick={() => fileRef.current?.click()}>
+            {uploading ?? (multiple ? "Upload new images" : "Upload new image")}
           </button>
           <button type="button" className="btn btn-ghost" onClick={onClose}>
             Close
@@ -128,27 +162,46 @@ export function MediaDialog({
           {uploadError ? <p className="w-full text-sm font-medium text-danger-700">{uploadError}</p> : null}
         </div>
         <div className="grid grid-cols-3 gap-3 overflow-y-auto p-4 sm:grid-cols-4 md:grid-cols-6">
-          {filtered.slice(0, limit).map((o) => (
-            <button
-              key={o.id}
-              type="button"
-              title={o.name}
-              onClick={() => onPick(o)}
-              className={`group overflow-hidden rounded-lg border text-left ${o.id === selectedId ? "border-brand-600 ring-2 ring-brand-400" : "border-line hover:border-brand-300"}`}
-            >
-              {/* eslint-disable-next-line @next/next/no-img-element */}
-              <img src={o.url} alt={o.alt ?? ""} loading="lazy" className="aspect-square w-full bg-paper object-cover" />
-              <span className="block truncate px-1.5 py-1 text-[11px] text-muted">
-                #{o.id} {o.name}
-              </span>
-            </button>
-          ))}
+          {filtered.slice(0, limit).map((o) => {
+            const order = multiple ? chosen.findIndex((c) => c.id === o.id) : -1;
+            const on = multiple ? order >= 0 : o.id === selectedId;
+            return (
+              <button
+                key={o.id}
+                type="button"
+                title={o.name}
+                aria-pressed={multiple ? on : undefined}
+                onClick={() => (multiple ? toggle(o) : onPick?.(o))}
+                className={`group relative overflow-hidden rounded-lg border text-left ${on ? "border-brand-600 ring-2 ring-brand-400" : "border-line hover:border-brand-300"}`}
+              >
+                {/* eslint-disable-next-line @next/next/no-img-element */}
+                <img src={o.url} alt={o.alt ?? ""} loading="lazy" className="aspect-square w-full bg-paper object-cover" />
+                {order >= 0 ? <span className="absolute right-1 top-1 grid h-6 min-w-6 place-items-center rounded-full bg-brand-600 px-1 text-xs font-bold tabular-nums text-white shadow">{order + 1}</span> : null}
+                <span className="block truncate px-1.5 py-1 text-[11px] text-muted">
+                  #{o.id} {o.name}
+                </span>
+              </button>
+            );
+          })}
           {filtered.length === 0 ? <p className="col-span-full py-8 text-center text-sm text-muted">{!given && !loaded ? "Loading images…" : "No images match."}</p> : null}
         </div>
         {filtered.length > limit ? (
           <div className="border-t border-line p-3 text-center">
             <button type="button" className="btn btn-ghost" onClick={() => setLimit((l) => l + 60)}>
               Show more ({filtered.length - limit} left)
+            </button>
+          </div>
+        ) : null}
+        {multiple ? (
+          <div className="flex flex-wrap items-center gap-3 border-t border-line p-3">
+            <p className="mr-auto text-sm text-muted">{chosen.length ? `${chosen.length} selected. They are added in the order shown by the numbers.` : "Tick the pictures you want, or upload several from your computer at once."}</p>
+            {chosen.length ? (
+              <button type="button" className="btn btn-ghost" onClick={() => setChosen([])}>
+                Clear
+              </button>
+            ) : null}
+            <button type="button" className="btn btn-primary" disabled={uploading !== null || chosen.length === 0} onClick={() => onPickMany?.(chosen)}>
+              {chosen.length ? `Use ${chosen.length} selected` : "Use selected"}
             </button>
           </div>
         ) : null}

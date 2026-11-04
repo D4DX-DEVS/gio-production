@@ -688,7 +688,7 @@ export const notFoundLog = sqliteTable("not_found_log", {
 });
 
 // ---------------------------------------------------------------------------
-// 9. Migration bookkeeping and client review queue
+// 9. Migration bookkeeping
 // ---------------------------------------------------------------------------
 
 export const importRuns = sqliteTable(
@@ -751,37 +751,4 @@ export const importConflicts = sqliteTable(
     resolvedAt: ms("resolved_at"),
   },
   (t) => [uniqueIndex("import_conflicts_key_field").on(t.legacyKey, t.field)],
-);
-
-export const REVIEW_ITEM_STATUSES = ["pending", "keep_as_is", "change_approved", "rejected"] as const;
-
-/** Everything that needs a client decision. */
-export const reviewItems = sqliteTable(
-  "review_items",
-  {
-    id: integer("id").primaryKey(),
-    /** Stable key so re-imports update instead of duplicating (added to the proposal). */
-    reviewKey: text("review_key").notNull().unique(),
-    code: text("code").notNull(),
-    title: text("title").notNull(),
-    entityType: text("entity_type"),
-    entityId: text("entity_id"),
-    field: text("field"),
-    currentValue: text("current_value"),
-    /** Only when the client or evidence supplies one. Never guessed. */
-    suggestedValue: text("suggested_value"),
-    evidence: text("evidence"),
-    status: text("status", { enum: REVIEW_ITEM_STATUSES }).notNull().default("pending"),
-    decisionNote: text("decision_note"),
-    decidedBy: text("decided_by"),
-    decidedAt: ms("decided_at"),
-    createdAt: ms("created_at").notNull().default(now),
-  },
-  (t) => [
-    index("review_items_status").on(t.status, t.code),
-    check(
-      "review_items_status_check",
-      sql.raw(`status IN ('pending','keep_as_is','change_approved','rejected')`),
-    ),
-  ],
 );

@@ -8,21 +8,8 @@
 
 const stroke = { fill: "none", stroke: "currentColor", strokeLinecap: "round", strokeLinejoin: "round" } as const;
 
-/** A strip of film: a faint band with a row of sprocket holes (a column of them when vertical). */
-function FilmStrip({ id, className, vertical = false }: { id: string; className: string; vertical?: boolean }) {
-  if (vertical) {
-    return (
-      <svg aria-hidden className={`absolute inset-y-0 h-full w-7 text-white ${className}`} width="28">
-        <defs>
-          <pattern id={id} width="28" height="36" patternUnits="userSpaceOnUse">
-            <rect x="8" y="10" width="12" height="16" rx="3" fill="currentColor" fillOpacity="0.2" />
-          </pattern>
-        </defs>
-        <rect width="28" height="100%" fill="currentColor" fillOpacity="0.07" />
-        <rect width="28" height="100%" fill={`url(#${id})`} />
-      </svg>
-    );
-  }
+/** A strip of film: a faint band with a row of sprocket holes. */
+function FilmStrip({ id, className }: { id: string; className: string }) {
   return (
     <svg aria-hidden className={`absolute inset-x-0 h-7 w-full text-white ${className}`} height="28">
       <defs>
@@ -50,8 +37,6 @@ export function VideoBackdrop() {
     <div aria-hidden className="pointer-events-none absolute inset-0 overflow-hidden text-white">
       <FilmStrip id="film-holes-top" className="top-0" />
       <FilmStrip id="film-holes-bottom" className="bottom-0" />
-      <FilmStrip id="film-holes-left" className="left-0 hidden lg:block" vertical />
-      <FilmStrip id="film-holes-right" className="right-0 hidden lg:block" vertical />
 
       {/* Big outlined play button drifting in the right margin. */}
       <svg viewBox="0 0 100 100" className="float-slow absolute -right-14 top-[18%] hidden h-72 w-72 text-white/[0.13] sm:block lg:h-96 lg:w-96" {...stroke} strokeWidth="1.6">

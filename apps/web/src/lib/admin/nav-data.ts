@@ -24,15 +24,13 @@ export const fixedPageIds = remember(5 * 60_000, async () => {
   return new Map(rows.map((r) => [r.slug, r.id]));
 });
 
-/** Client questions waiting, new contact messages, old addresses waiting. One round trip; never blocks the page. */
+/** New contact messages waiting. One round trip; never blocks the page. */
 export const badgeCounts = remember(15_000, async () => {
   try {
-    const [row] = await getDb().all<{ review: number; messages: number; urls: number }>(sql`select
-      (select count(*) from ${s.reviewItems} where ${s.reviewItems.status} = 'pending') as review,
-      (select count(*) from ${s.contactSubmissions} where ${s.contactSubmissions.status} = 'new') as messages,
-      (select count(*) from ${s.legacyUrls} where ${s.legacyUrls.action} = 'pending_decision') as urls`);
-    return { review: Number(row?.review) || 0, messages: Number(row?.messages) || 0, urls: Number(row?.urls) || 0 };
+    const [row] = await getDb().all<{ messages: number }>(sql`select
+      (select count(*) from ${s.contactSubmissions} where ${s.contactSubmissions.status} = 'new') as messages`);
+    return { messages: Number(row?.messages) || 0 };
   } catch {
-    return { review: 0, messages: 0, urls: 0 };
+    return { messages: 0 };
   }
 });
